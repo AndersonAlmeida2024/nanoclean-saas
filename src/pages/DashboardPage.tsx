@@ -42,75 +42,78 @@ export function DashboardPage() {
     });
     const [todaySchedule, setTodaySchedule] = useState<TodayAppointment[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
     const currentHour = new Date().getHours();
     const greeting = currentHour < 12 ? 'Bom dia' : currentHour < 18 ? 'Boa tarde' : 'Boa noite';
     const userName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Usuário';
 
-    useEffect(() => {
-        async function loadDashboardData() {
-            try {
-                setIsLoading(true);
+    const loadDashboardData = async () => {
+        try {
+            setIsLoading(true);
+            setError(null);
 
-                // Carregar dados em paralelo
-                const [clients, financeStats, todayAppointments] = await Promise.all([
-                    clientService.getAll().catch(() => []),
-                    transactionService.getStats().catch(() => ({ totalIncome: 0 })),
-                    appointmentService.getByDate(
-                        format(new Date(), 'yyyy-MM-dd')
-                    ).catch(() => [])
-                ]);
+            // Carregar dados em paralelo
+            const [clients, financeStats, todayAppointments] = await Promise.all([
+                clientService.getAll().catch((err) => { throw err }),
+                transactionService.getStats().catch((err) => { throw err }),
+                appointmentService.getByDate(
+                    format(new Date(), 'yyyy-MM-dd')
+                ).catch((err) => { throw err })
+            ]);
 
-                // Calcular estatísticas
-                const activeClients = clients?.filter((c: { status?: string }) => c.status === 'active').length || 0;
-                const newLeads = clients?.filter((c: { status?: string }) => c.status === 'lead').length || 0;
-                const activeToday = todayAppointments?.filter((a: { status?: string }) => a.status !== 'cancelled') || [];
+            // Calcular estatísticas
+            const activeClients = clients?.filter((c: { status?: string }) => c.status === 'active').length || 0;
+            const newLeads = clients?.filter((c: { status?: string }) => c.status === 'lead').length || 0;
+            const activeToday = todayAppointments?.filter((a: { status?: string }) => a.status !== 'cancelled') || [];
 
-                setStats({
-                    revenue: financeStats.totalIncome || 0,
-                    activeClients,
-                    todayServices: activeToday.length,
-                    pendingServices: activeToday.filter((a: { status?: string }) => a.status === 'scheduled').length || 0,
-                    newLeads
+            setStats({
+                revenue: financeStats.totalIncome || 0,
+                activeClients,
+                todayServices: activeToday.length,
+                pendingServices: activeToday.filter((a: { status?: string }) => a.status === 'scheduled').length || 0,
+                newLeads
+            });
+
+            // Formatar agenda do dia (Apenas ativos)
+            const now = new Date();
+            const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+            const formattedSchedule: TodayAppointment[] = (todayAppointments || [])
+                .filter((a: { status?: string }) => a.status !== 'cancelled')
+                .map((apt: {
+                    scheduled_time?: string;
+                    clients?: { name?: string } | null;
+                    service_type?: string;
+                    status?: string;
+                }) => {
+                    const aptTime = apt.scheduled_time || '00:00';
+                    let status: 'done' | 'current' | 'pending' = 'pending';
+
+                    if (apt.status === 'completed') {
+                        status = 'done';
+                    } else if (aptTime <= currentTime && apt.status === 'scheduled') {
+                        status = 'current';
+                    }
+
+                    return {
+                        time: aptTime.substring(0, 5),
+                        client: apt.clients?.name || 'Cliente',
+                        service: apt.service_type || 'Serviço',
+                        status
+                    };
                 });
 
-                // Formatar agenda do dia (Apenas ativos)
-                const now = new Date();
-                const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-
-                const formattedSchedule: TodayAppointment[] = (todayAppointments || [])
-                    .filter((a: { status?: string }) => a.status !== 'cancelled')
-                    .map((apt: {
-                        scheduled_time?: string;
-                        clients?: { name?: string } | null;
-                        service_type?: string;
-                        status?: string;
-                    }) => {
-                        const aptTime = apt.scheduled_time || '00:00';
-                        let status: 'done' | 'current' | 'pending' = 'pending';
-
-                        if (apt.status === 'completed') {
-                            status = 'done';
-                        } else if (aptTime <= currentTime && apt.status === 'scheduled') {
-                            status = 'current';
-                        }
-
-                        return {
-                            time: aptTime.substring(0, 5),
-                            client: apt.clients?.name || 'Cliente',
-                            service: apt.service_type || 'Serviço',
-                            status
-                        };
-                    });
-
-                setTodaySchedule(formattedSchedule);
-            } catch (error) {
-                console.error('Erro ao carregar dashboard:', error);
-            } finally {
-                setIsLoading(false);
-            }
+            setTodaySchedule(formattedSchedule);
+        } catch (error) {
+            console.error('Erro ao carregar dashboard:', error);
+            setError('Não foi possível carregar as informações do painel. Verifique sua conexão.');
+        } finally {
+            setIsLoading(false);
         }
+    };
 
+    useEffect(() => {
         loadDashboardData();
     }, []);
 
@@ -149,6 +152,24 @@ export function DashboardPage() {
         return (
             <div className="flex items-center justify-center h-64">
                 <div className="w-8 h-8 border-2 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin" />
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="min-h-[400px] flex flex-col items-center justify-center text-center p-6 bg-white/5 border border-white/10 rounded-3xl">
+                <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mb-6">
+                    <AlertCircle className="text-red-500" size={32} />
+                </div>
+                <h2 className="text-xl font-bold text-white mb-2">Ops! Algo deu errado</h2>
+                <p className="text-gray-400 max-w-sm mb-8">{error}</p>
+                <button
+                    onClick={() => loadDashboardData()}
+                    className="px-8 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-white font-bold transition-all active:scale-95"
+                >
+                    Tentar Novamente
+                </button>
             </div>
         );
     }

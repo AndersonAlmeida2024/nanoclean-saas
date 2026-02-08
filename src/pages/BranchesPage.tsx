@@ -58,7 +58,7 @@ export function BranchesPage() {
     }
 
     // Se estiver carregando as informações de autenticação/membership
-    if (!activeMembership && isLoading) {
+    if (isLoading) {
         return (
             <div className="flex items-center justify-center h-[70vh]">
                 <Loader2 className="text-cyan-500 animate-spin" size={40} />

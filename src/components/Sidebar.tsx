@@ -1,5 +1,5 @@
 // arquivo: src/components/Sidebar.tsx
-import { Home, Calendar, Users, DollarSign, Menu, LogOut, GitBranch, Building, ShieldCheck } from 'lucide-react';
+import { Home, Calendar, Users, DollarSign, GitBranch, Menu, Building, ShieldCheck, LogOut } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { useState } from 'react';
 import { cn } from '../utils/cn';
@@ -8,16 +8,21 @@ import { useAuthStore } from '../stores/authStore';
 import { CompanySelector } from './CompanySelector';
 
 const NAV_ITEMS = [
-    { icon: Home, label: 'Painel', path: '/' },
+    { icon: Home, label: 'Dashboard', path: '/' },
     { icon: Calendar, label: 'Agenda', path: '/schedule' },
-    { icon: Users, label: 'Clientes (CRM)', path: '/crm' },
+    { icon: Users, label: 'CRM', path: '/crm' },
     { icon: DollarSign, label: 'Financeiro', path: '/finance' },
-    { icon: GitBranch, label: 'Filiais', path: '/branches' },
 ];
 
 export function Sidebar() {
     const [isCollapsed, setIsCollapsed] = useState(false);
-    const { logout, isPlatformAdmin, platformContextLoaded } = useAuthStore();
+    const { logout, isPlatformAdmin, platformContextLoaded, memberships, activeCompanyId } = useAuthStore();
+
+    // Contexto da empresa ativa para visibilidade de Filiais
+    const activeMembership = memberships.find(m => m.company_id === activeCompanyId);
+    const isMatrix = activeMembership?.companies?.company_type === 'matrix';
+    const isOwnerOrAdmin = activeMembership?.role === 'owner' || activeMembership?.role === 'admin';
+    const canSeeBranches = isMatrix && isOwnerOrAdmin;
 
     return (
         <motion.aside
@@ -52,7 +57,7 @@ export function Sidebar() {
             )}
 
             {/* Navigation */}
-            <nav className="flex-1 px-4 py-4 space-y-2">
+            <nav className="flex-1 px-4 py-4 space-y-2 overflow-y-auto custom-scrollbar">
                 {!platformContextLoaded ? (
                     // Skeleton Loader
                     Array(4).fill(0).map((_, i) => (
@@ -61,57 +66,82 @@ export function Sidebar() {
                             {!isCollapsed && <div className="h-4 bg-white/10 rounded w-24" />}
                         </div>
                     ))
-                ) : isPlatformAdmin ? (
-                    // Platform Admin Menu
-                    <>
-                        <NavLink
-                            to="/admin/companies"
-                            className={({ isActive }) => cn(
-                                'flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-200 text-gray-400 hover:bg-white/5 hover:text-white',
-                                isActive && 'bg-gradient-to-r from-cyan-500/10 to-purple-500/10 text-white border border-white/10'
-                            )}
-                        >
-                            <Building size={20} className="shrink-0" />
-                            {!isCollapsed && <span className="font-medium">Empresas</span>}
-                        </NavLink>
-                        <NavLink
-                            to="/admin/audit"
-                            className={({ isActive }) => cn(
-                                'flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-200 text-gray-400 hover:bg-white/5 hover:text-white',
-                                isActive && 'bg-gradient-to-r from-cyan-500/10 to-purple-500/10 text-white border border-white/10'
-                            )}
-                        >
-                            <ShieldCheck size={20} className="shrink-0" />
-                            {!isCollapsed && <span className="font-medium">Auditoria</span>}
-                        </NavLink>
-                    </>
                 ) : (
-                    // Business (Tenant) Menu
-                    NAV_ITEMS.map((item) => (
-                        <NavLink
-                            key={item.path}
-                            to={item.path}
-                            className={({ isActive }) =>
-                                cn(
-                                    'flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-200 group relative',
-                                    isActive
-                                        ? 'bg-gradient-to-r from-cyan-500/10 to-purple-500/10 text-white border border-white/10'
-                                        : 'text-gray-400 hover:bg-white/5 hover:text-white'
-                                )
-                            }
-                        >
-                            <item.icon size={20} className="shrink-0" />
-                            {!isCollapsed && (
-                                <motion.span
-                                    initial={{ opacity: 0, x: -10 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    className="font-medium"
+                    <>
+                        {/* Business (Tenant) Menu */}
+                        {NAV_ITEMS.map((item) => (
+                            <NavLink
+                                key={item.path}
+                                to={item.path}
+                                className={({ isActive }) =>
+                                    cn(
+                                        'flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-200 group relative',
+                                        isActive
+                                            ? 'bg-gradient-to-r from-cyan-500/10 to-purple-500/10 text-white border border-white/10'
+                                            : 'text-gray-400 hover:bg-white/5 hover:text-white'
+                                    )
+                                }
+                            >
+                                <item.icon size={20} className="shrink-0" />
+                                {!isCollapsed && (
+                                    <motion.span
+                                        initial={{ opacity: 0, x: -10 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        className="font-medium"
+                                    >
+                                        {item.label}
+                                    </motion.span>
+                                )}
+                            </NavLink>
+                        ))}
+
+                        {/* Filiais (Apenas para Matriz + Admin) */}
+                        {canSeeBranches && (
+                            <NavLink
+                                to="/branches"
+                                className={({ isActive }) => cn(
+                                    'flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-200 text-gray-400 hover:bg-white/5 hover:text-white',
+                                    isActive && 'bg-gradient-to-r from-cyan-500/10 to-purple-500/10 text-white border border-white/10'
+                                )}
+                            >
+                                <GitBranch size={20} className="shrink-0" />
+                                {!isCollapsed && <span className="font-medium">Filiais</span>}
+                            </NavLink>
+                        )}
+
+                        {/* Separador para Admin se necessário */}
+                        {isPlatformAdmin && !isCollapsed && (
+                            <div className="pt-4 pb-2 px-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                                Admin Platform
+                            </div>
+                        )}
+
+                        {/* Platform Admin Menu */}
+                        {isPlatformAdmin && (
+                            <>
+                                <NavLink
+                                    to="/admin/companies"
+                                    className={({ isActive }) => cn(
+                                        'flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-200 text-gray-400 hover:bg-white/5 hover:text-white',
+                                        isActive && 'bg-gradient-to-r from-cyan-500/10 to-purple-500/10 text-white border border-white/10'
+                                    )}
                                 >
-                                    {item.label}
-                                </motion.span>
-                            )}
-                        </NavLink>
-                    ))
+                                    <Building size={20} className="shrink-0" />
+                                    {!isCollapsed && <span className="font-medium">Empresas</span>}
+                                </NavLink>
+                                <NavLink
+                                    to="/admin/audit"
+                                    className={({ isActive }) => cn(
+                                        'flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-200 text-gray-400 hover:bg-white/5 hover:text-white',
+                                        isActive && 'bg-gradient-to-r from-cyan-500/10 to-purple-500/10 text-white border border-white/10'
+                                    )}
+                                >
+                                    <ShieldCheck size={20} className="shrink-0" />
+                                    {!isCollapsed && <span className="font-medium">Auditoria</span>}
+                                </NavLink>
+                            </>
+                        )}
+                    </>
                 )}
             </nav>
 

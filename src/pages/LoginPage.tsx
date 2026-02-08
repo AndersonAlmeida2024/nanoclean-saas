@@ -27,12 +27,15 @@ export function LoginPage() {
             });
 
             if (authError) {
+                console.error('Login error:', authError);
                 if (authError.message.includes('Invalid login credentials')) {
                     setError('E-mail ou senha incorretos.');
                 } else if (authError.message.includes('Email not confirmed')) {
-                    setError('Confirme seu e-mail antes de fazer login.');
+                    setError('Seu e-mail ainda não foi confirmado. Verifique sua caixa de entrada.');
+                } else if (authError.message.includes('Too many requests') || (authError as any).status === 429) {
+                    setError('Muitas tentativas. Aguarde alguns instantes e tente novamente.');
                 } else {
-                    setError(authError.message);
+                    setError('Erro ao entrar. Verifique seus dados e tente novamente.');
                 }
                 return;
             }
@@ -42,8 +45,8 @@ export function LoginPage() {
                 navigate('/');
             }
         } catch (err) {
-            console.error('Login error:', err);
-            setError('Erro ao fazer login. Tente novamente.');
+            console.error('Login unexpected error:', err);
+            setError('Erro inesperado. Verifique sua conexão e tente novamente.');
         } finally {
             setIsLoading(false);
         }

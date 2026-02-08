@@ -85,11 +85,16 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 // reintroduce and use them where appropriate.
 
 export default function App() {
-  const { initialize, isAuthenticated, isPlatformAdmin } = useAuthStore();
+  const { initialize, isAuthenticated, isPlatformAdmin, memberships, activeCompanyId } = useAuthStore();
 
   useEffect(() => {
     initialize();
   }, [initialize]);
+
+  // Auxiliares de Permissão
+  const activeMembership = memberships.find(m => m.company_id === activeCompanyId);
+  const isMatrix = activeMembership?.companies?.company_type === 'matrix';
+  const isOwnerOrAdmin = activeMembership?.role === 'owner' || activeMembership?.role === 'admin';
 
   return (
     <ErrorBoundary>
@@ -99,7 +104,7 @@ export default function App() {
             <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />} />
             <Route path="/register" element={isAuthenticated ? <Navigate to="/" replace /> : <RegisterPage />} />
             <Route path="/forgot" element={isAuthenticated ? <Navigate to="/" replace /> : <ForgotPasswordPage />} />
-            <Route path="/reset" element={isAuthenticated ? <Navigate to="/" replace /> : <ResetPasswordPage />} />
+            <Route path="/reset" element={<ResetPasswordPage />} />
             <Route path="/share/:token" element={<ShareAppointmentPage />} />
 
             <Route path="/" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
@@ -107,7 +112,12 @@ export default function App() {
               <Route path="crm" element={<CRMPage />} />
               <Route path="finance" element={<FinancePage />} />
               <Route path="schedule" element={<SchedulePage />} />
-              <Route path="branches" element={<BranchesPage />} />
+
+              {/* Gestão de Filiais (Restrito à Matriz / Admin) */}
+              <Route
+                path="branches"
+                element={(isMatrix && isOwnerOrAdmin) ? <BranchesPage /> : <Navigate to="/" replace />}
+              />
 
               {/* Rotas Administrativas (Platform Only) */}
               {isPlatformAdmin && (

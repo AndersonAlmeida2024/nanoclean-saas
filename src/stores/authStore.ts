@@ -39,25 +39,51 @@ export const useAuthStore = create<AuthState>()(
             initialize: async () => {
                 set({ isLoading: true });
                 try {
-                    const { data: { session } } = await supabase.auth.getSession();
+                    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+                    if (sessionError) {
+                        console.error('Error fetching session:', sessionError);
+                        throw sessionError;
+                    }
 
                     if (session?.user) {
-                        const [profile, memberships] = await Promise.all([
-                            userService.getProfile(session.user.id),
-                            companyService.listMyCompanies()
-                        ]);
+                        try {
+                            const [profile, memberships] = await Promise.all([
+                                userService.getProfile(session.user.id).catch(err => {
+                                    console.error('Failed to fetch profile:', err);
+                                    return null;
+                                }),
+                                companyService.listMyCompanies().catch(err => {
+                                    console.error('Failed to fetch companies:', err);
+                                    return [];
+                                })
+                            ]);
 
-                        const activeId = profile?.active_company_id || profile?.company_id || null;
+                            const activeId = profile?.active_company_id || profile?.company_id || null;
 
-                        set({
-                            user: session.user,
-                            activeCompanyId: activeId,
-                            companyId: activeId,
-                            memberships: memberships || [],
-                            isAuthenticated: true,
-                            isPlatformAdmin: profile?.is_platform_admin || false,
-                            platformContextLoaded: true
-                        });
+                            set({
+                                user: session.user,
+                                activeCompanyId: activeId,
+                                companyId: activeId,
+                                memberships: memberships || [],
+                                isAuthenticated: true,
+                                isPlatformAdmin: profile?.is_platform_admin || false,
+                                platformContextLoaded: true
+                            });
+                        } catch (innerErr) {
+                            console.error('Error fetching user context:', innerErr);
+                            // Even if context fails, we might want to let them in as "incomplete" user or logout
+                            // For now, let's treat as authenticated but with limited data
+                            set({
+                                user: session.user,
+                                activeCompanyId: null,
+                                companyId: null,
+                                memberships: [],
+                                isAuthenticated: true,
+                                isPlatformAdmin: false,
+                                platformContextLoaded: true
+                            });
+                        }
                     } else {
                         set({
                             user: null,
@@ -72,20 +98,24 @@ export const useAuthStore = create<AuthState>()(
 
                     supabase.auth.onAuthStateChange(async (event, session) => {
                         if (event === 'SIGNED_IN' && session?.user) {
-                            const [profile, memberships] = await Promise.all([
-                                userService.getProfile(session.user.id),
-                                companyService.listMyCompanies()
-                            ]);
-                            const activeId = profile?.active_company_id || profile?.company_id || null;
-                            set({
-                                user: session.user,
-                                activeCompanyId: activeId,
-                                companyId: activeId,
-                                memberships: memberships || [],
-                                isAuthenticated: true,
-                                isPlatformAdmin: profile?.is_platform_admin || false,
-                                platformContextLoaded: true
-                            });
+                            try {
+                                const [profile, memberships] = await Promise.all([
+                                    userService.getProfile(session.user.id).catch(() => null),
+                                    companyService.listMyCompanies().catch(() => [])
+                                ]);
+                                const activeId = profile?.active_company_id || profile?.company_id || null;
+                                set({
+                                    user: session.user,
+                                    activeCompanyId: activeId,
+                                    companyId: activeId,
+                                    memberships: memberships || [],
+                                    isAuthenticated: true,
+                                    isPlatformAdmin: profile?.is_platform_admin || false,
+                                    platformContextLoaded: true
+                                });
+                            } catch (error) {
+                                console.error('Auth state change error:', error);
+                            }
                         } else if (event === 'SIGNED_OUT') {
                             set({
                                 user: null,
@@ -100,17 +130,37 @@ export const useAuthStore = create<AuthState>()(
                     });
                 } catch (err) {
                     console.error('Error initializing auth store:', err);
-                    // Ensure platform context is marked as loaded even if initialization failed
-                    set({ platformContextLoaded: true });
+                    set({
+                        user: null,
+                        activeCompanyId: null,
+                        companyId: null,
+                        memberships: [],
+                        isAuthenticated: false,
+                        isPlatformAdmin: false,
+                        platformContextLoaded: true // CRITICAL: Always release 'loading' state
+                    });
                 } finally {
                     set({ isLoading: false });
                 }
             },
 
             logout: async () => {
-                await supabase.auth.signOut();
-                set({ user: null, activeCompanyId: null, companyId: null, memberships: [], isAuthenticated: false, isPlatformAdmin: false });
-                localStorage.removeItem('nanoclean-auth');
+                try {
+                    await supabase.auth.signOut();
+                } catch (error) {
+                    console.error('Erro ao sair:', error);
+                } finally {
+                    set({
+                        user: null,
+                        activeCompanyId: null,
+                        companyId: null,
+                        memberships: [],
+                        isAuthenticated: false,
+                        isPlatformAdmin: false,
+                        platformContextLoaded: true // Para evitar loaders infinitos se deslogar
+                    });
+                    localStorage.removeItem('nanoclean-auth');
+                }
             },
 
             switchCompany: async (companyId: string) => {

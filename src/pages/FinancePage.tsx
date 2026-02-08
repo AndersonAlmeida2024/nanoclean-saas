@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { FinanceStats } from '../modules/finance/components/FinanceStats';
 import { FinanceChart } from '../modules/finance/components/FinanceChart';
 import { ExpenseModal } from '../modules/finance/components/ExpenseModal';
-import { Download, Plus, Filter, FileText, ChevronDown, Calendar, X, Calculator, Loader2 } from 'lucide-react';
+import { Download, Plus, Filter, FileText, ChevronDown, Calendar, X, Calculator, Loader2, AlertCircle } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { transactionService } from '../services/transactionService';
@@ -16,6 +16,7 @@ export function FinancePage() {
     const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
 
     // Date Filters
@@ -29,12 +30,12 @@ export function FinancePage() {
     const loadData = async () => {
         try {
             setIsLoading(true);
+            setError(null);
             const data = await transactionService.getAll();
-            // Cast or map data to ensure it matches Transaction interface if needed
-            // Assuming transactionService returns compatible data
             setTransactions((data as unknown as Transaction[]) || []);
         } catch (err) {
             console.error('Erro ao carregar finanças:', err);
+            setError('Não foi possível carregar os dados financeiros. Verifique sua conexão.');
         } finally {
             setIsLoading(false);
         }
@@ -189,6 +190,32 @@ export function FinancePage() {
             console.error('Erro ao exportar relatório:', error);
         }
     };
+
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <div className="w-8 h-8 border-2 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin" />
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="min-h-[400px] flex flex-col items-center justify-center text-center p-6 bg-white/5 border border-white/10 rounded-3xl">
+                <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mb-6">
+                    <AlertCircle className="text-red-500" size={32} />
+                </div>
+                <h2 className="text-xl font-bold text-white mb-2">Ops! Algo deu errado</h2>
+                <p className="text-gray-400 max-w-sm mb-8">{error}</p>
+                <button
+                    onClick={() => loadData()}
+                    className="px-8 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-white font-bold transition-all active:scale-95"
+                >
+                    Tentar Novamente
+                </button>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-8 pb-12 animate-in fade-in duration-500">

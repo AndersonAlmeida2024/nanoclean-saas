@@ -1,7 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, ArrowRight } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+
+function isValidEmail(value: string) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
 
 export function ForgotPasswordPage() {
     const [email, setEmail] = useState('');
@@ -9,50 +13,109 @@ export function ForgotPasswordPage() {
     const [cooldown, setCooldown] = useState<number>(0);
     const [message, setMessage] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const timerRef = useRef<number | null>(null);
+
+    // Carregar cooldown do localStorage ao montar
+    useEffect(() => {
+        const savedCooldown = localStorage.getItem('forgot_password_cooldown');
+        if (savedCooldown) {
+            const expiryTime = parseInt(savedCooldown, 10);
+            const now = Date.now();
+            const remaining = Math.ceil((expiryTime - now) / 1000);
+
+            if (remaining > 0) {
+                startCooldown(remaining);
+            } else {
+                localStorage.removeItem('forgot_password_cooldown');
+            }
+        }
+
+        return () => {
+            if (timerRef.current) {
+                window.clearInterval(timerRef.current);
+            }
+        };
+    }, []);
+
+    const startCooldown = (seconds: number) => {
+        setCooldown(seconds);
+        
+        // Salvar tempo de expiração no localStorage
+        const expiryTime = Date.now() + (seconds * 1000);
+        localStorage.setItem('forgot_password_cooldown', expiryTime.toString());
+
+        if (timerRef.current) {
+            window.clearInterval(timerRef.current);
+            timerRef.current = null;
+        }
+
+        timerRef.current = window.setInterval(() => {
+            setCooldown((c) => {
+                if (c <= 1) {
+                    if (timerRef.current) {
+                        window.clearInterval(timerRef.current);
+                        timerRef.current = null;
+                    }
+                    localStorage.removeItem('forgot_password_cooldown');
+                    return 0;
+                }
+                return c - 1;
+            });
+        }, 1000);
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setIsLoading(true);
         setError(null);
         setMessage(null);
+
+        const cleanEmail = email.trim().toLowerCase();
+
+        if (cooldown > 0) {
+            setError(`Aguarde ${cooldown}s antes de solicitar outro link.`);
+            return;
+        }
+
+        if (!isValidEmail(cleanEmail)) {
+            setError('Digite um e-mail válido.');
+            return;
+        }
+
+        setIsLoading(true);
+
         try {
-            if (cooldown > 0) {
-                setError(`Aguarde ${cooldown}s antes de solicitar outro link.`);
+            const redirectTo = `${window.location.origin}/reset`;
+            
+            // Iniciar cooldown preventivo de 60s antes mesmo de chamar, 
+            // para evitar spam de cliques
+            startCooldown(60);
+
+            const { error: supaError } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+                redirectTo,
+            });
+
+            if (supaError) {
+                console.error('resetPasswordForEmail error:', supaError);
+                const msg = supaError.message?.toLowerCase() || '';
+                const status = (supaError as any)?.status;
+
+                // Rate limit handling
+                if (status === 429 || msg.includes('rate') || msg.includes('too many') || msg.includes('limit')) {
+                    setError('Muitas tentativas. Aguarde 3 minutos antes de tentar novamente.');
+                    startCooldown(180); // 3 min forced cooldown
+                } else if (msg.includes('redirect') || msg.includes('url')) {
+                    setError('Erro de configuração de URL no sistema via Supabase.');
+                } else {
+                    setError('Erro ao enviar e-mail. Tente novamente mais tarde.');
+                }
                 return;
             }
 
-            // Tenta enviar o e-mail de recuperação
-            // Usa automaticamente window.location.origin para redirect (suporta 5173/5174 conforme dev server)
-            // @ts-ignore
-            const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-                redirectTo: `${window.location.origin}/reset`
-            });
-
-            if (error) {
-                // Log completo para debugging em dev, mas mostra mensagem amigável para o usuário
-                console.error('resetPasswordForEmail error:', error);
-                if ((error as any)?.status === 429 || /rate/i.test(error.message || '')) {
-                    setError('Muitas solicitações. Aguarde alguns minutos e tente novamente.');
-                } else {
-                    setError('Não foi possível enviar o e-mail. Tente novamente mais tarde.');
-                }
-            } else {
-                setMessage('E-mail de recuperação enviado. Verifique sua caixa de entrada.');
-                // ativa cooldown de 60s
-                setCooldown(60);
-                const t = setInterval(() => {
-                    setCooldown((c) => {
-                        if (c <= 1) {
-                            clearInterval(t);
-                            return 0;
-                        }
-                        return c - 1;
-                    });
-                }, 1000);
-            }
+            setMessage('E-mail de recuperação enviado! Verifique sua caixa de entrada e spam.');
+            setEmail('');
         } catch (err: any) {
             console.error('Forgot password unexpected error:', err);
-            setError('Erro ao enviar e-mail. Tente novamente mais tarde.');
+            setError('Erro inesperado. Tente novamente mais tarde.');
         } finally {
             setIsLoading(false);
         }
@@ -101,7 +164,9 @@ export function ForgotPasswordPage() {
 
                     <p className="text-center text-gray-400 mt-6">
                         Lembrou a senha?{' '}
-                        <Link to="/login" className="text-cyan-400 hover:text-cyan-300 font-medium">Entrar</Link>
+                        <Link to="/login" className="text-cyan-400 hover:text-cyan-300 font-medium">
+                            Entrar
+                        </Link>
                     </p>
                 </div>
             </div>
