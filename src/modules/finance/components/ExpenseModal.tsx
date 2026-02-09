@@ -23,7 +23,7 @@ const expenseSchema = z.object({
 });
 
 export function ExpenseModal({ isOpen, onClose, onSuccess }: ExpenseModalProps) {
-    const user = useAuthStore((state) => state.user);
+    const { user, companyId } = useAuthStore();
     const firstInputRef = useRef<HTMLInputElement>(null);
 
     // UI States
@@ -94,6 +94,7 @@ export function ExpenseModal({ isOpen, onClose, onSuccess }: ExpenseModalProps) 
                 description: formData.description,
                 category: formData.category,
                 user_id: user.id,
+                company_id: companyId || '',
                 date: formData.date
             };
 

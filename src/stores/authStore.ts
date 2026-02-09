@@ -4,13 +4,14 @@ import { supabase } from '../lib/supabase';
 import type { User } from '@supabase/supabase-js';
 import { userService } from '../services/userService';
 import { companyService } from '../services/companyService';
-import type { CompanyMembership } from '../services/companyService';
+import type { CompanyMembership, Company } from '../services/companyService';
 
 interface AuthState {
     user: User | null;
     activeCompanyId: string | null;
     companyId: string | null; // Alias para compatibilidade
     memberships: CompanyMembership[];
+    company: Company | null;
     isLoading: boolean;
     isAuthenticated: boolean;
     isPlatformAdmin: boolean;
@@ -29,6 +30,7 @@ export const useAuthStore = create<AuthState>()(
             activeCompanyId: null,
             companyId: null,
             memberships: [],
+            company: null,
             isLoading: true,
             isAuthenticated: false,
             isPlatformAdmin: false,
@@ -60,11 +62,20 @@ export const useAuthStore = create<AuthState>()(
                             ]);
 
                             const activeId = profile?.active_company_id || profile?.company_id || null;
+                            const activeMembership = (memberships || []).find(m => m.company_id === activeId);
+                            const companyObj = activeMembership?.companies || null;
+
+                            if (companyObj && companyObj.trial_ends_at) {
+                                companyObj.subscription_status = new Date(companyObj.trial_ends_at) > new Date() ? 'trial' : 'expired';
+                            } else if (companyObj) {
+                                companyObj.subscription_status = 'active';
+                            }
 
                             set({
                                 user: session.user,
                                 activeCompanyId: activeId,
                                 companyId: activeId,
+                                company: companyObj,
                                 memberships: memberships || [],
                                 isAuthenticated: true,
                                 isPlatformAdmin: profile?.is_platform_admin || false,
@@ -193,3 +204,51 @@ export const useAuthStore = create<AuthState>()(
         }
     )
 );
+
+// ✅ PERFORMANCE OPTIMIZATION: Specific selectors to prevent unnecessary re-renders
+// Components should use these instead of destructuring the entire store
+
+/**
+ * Selector: Get only companyId
+ * Use when component only needs company context
+ */
+export const useCompanyId = () => useAuthStore(state => state.companyId);
+
+/**
+ * Selector: Get only company object
+ * Use when component needs full company data
+ */
+export const useCompany = () => useAuthStore(state => state.company);
+
+/**
+ * Selector: Get only isAuthenticated
+ * Use for auth guards and conditional rendering
+ */
+export const useIsAuthenticated = () => useAuthStore(state => state.isAuthenticated);
+
+/**
+ * Selector: Get only platformContextLoaded
+ * Use for loading states that wait for initial context
+ */
+export const usePlatformLoaded = () => useAuthStore(state => state.platformContextLoaded);
+
+/**
+ * Selector: Get only user object
+ * Use when component needs user profile data
+ */
+export const useUser = () => useAuthStore(state => state.user);
+
+/**
+ * Selector: Get only isPlatformAdmin
+ * Use for admin-only features
+ */
+export const useIsPlatformAdmin = () => useAuthStore(state => state.isPlatformAdmin);
+
+/**
+ * Selector: Get combined company context
+ * Use when component needs companyId + platformContextLoaded together
+ */
+export const useCompanyContext = () => useAuthStore(state => ({
+    companyId: state.companyId,
+    platformContextLoaded: state.platformContextLoaded
+}));

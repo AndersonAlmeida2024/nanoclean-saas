@@ -12,36 +12,40 @@ export function ResetPasswordPage() {
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        // Supabase costuma colocar tokens na hash da URL (window.location.hash) ou em query params
-        // Vamos mesclar ambos para garantir compatibilidade
-        const combined = [window.location.search.replace(/^\?/, ''), window.location.hash.replace(/^#/, '')]
-            .filter(Boolean)
-            .join('&');
-        const params = new URLSearchParams(combined);
-        const at = params.get('access_token') || params.get('access-token');
-        const rt = params.get('refresh_token') || params.get('refresh-token');
+        // Função para extrair tokens tanto de query params (?) quanto de hash (#)
+        const getParam = (name: string) => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const hashParams = new URLSearchParams(window.location.hash.replace('#', '?'));
+            return urlParams.get(name) || hashParams.get(name);
+        };
+
+        const at = getParam('access_token');
+        const rt = getParam('refresh_token');
+
         if (!at) {
-            // nenhum token encontrado
             setTokensPresent(false);
-            setError('Link inválido ou incompleto. Solicite um novo link de recuperação.');
-            console.debug('ResetPasswordPage: no access_token found in URL');
+            setError('Link inválido ou expirado. Solicite um novo link.');
             return;
         }
 
         setTokensPresent(true);
 
-        // tenta setar sessão para permitir updateUser
-        (async () => {
+        // Tenta validar a sessão com os tokens recebidos
+        const setupSession = async () => {
             try {
-                // @ts-expect-error - setSession may not be typed for the SDK variants
-                await supabase.auth.setSession({ access_token: at, refresh_token: rt });
-            } catch (e: any) {
-                // Log real reason for dev, but show a clean UI message
-                console.warn('setSession failed:', e);
-                setError('Não foi possível validar o link de redefinição. Você pode solicitar um novo link.');
+                const { error } = await supabase.auth.setSession({
+                    access_token: at,
+                    refresh_token: rt || '',
+                });
+                if (error) throw error;
+            } catch (e) {
+                console.error('Erro ao validar sessão:', e);
+                setError('Sessão expirada. Solicite um novo link de recuperação.');
                 setTokensPresent(false);
             }
-        })();
+        };
+
+        setupSession();
     }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {

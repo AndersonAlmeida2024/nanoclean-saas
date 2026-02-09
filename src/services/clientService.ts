@@ -5,10 +5,13 @@ type Client = Database['public']['Tables']['clients']['Row'];
 type ClientInsert = Database['public']['Tables']['clients']['Insert'];
 
 export const clientService = {
-    async getAll() {
+    async getAll(companyId: string) {
+        if (!companyId) throw new Error('Company ID is required to fetch clients');
+
         const { data, error } = await supabase
             .from('clients')
             .select('*')
+            .eq('company_id', companyId)
             .order('name', { ascending: true });
 
         if (error) {

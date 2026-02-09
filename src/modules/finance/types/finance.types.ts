@@ -36,6 +36,7 @@ export interface CreateTransactionDTO {
     description: string;
     category: TransactionCategory;
     user_id: string;
+    company_id: string;
     date?: string; // Optional custom date, defaults to now in backend if omitted
     appointment_id?: string;
 }

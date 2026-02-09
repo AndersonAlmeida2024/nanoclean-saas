@@ -1,195 +1,213 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Calendar as CalendarIcon, Clock, MapPin, Plus, Loader2, AlertCircle, RefreshCw, CheckCircle2, XCircle } from 'lucide-react';
+import { Plus, Calendar as CalendarIcon, Loader2, AlertCircle, CalendarDays } from 'lucide-react';
 import { format, startOfToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { inspectionService } from '../services/inspectionService';
 import { appointmentService } from '../services/appointmentService';
-import type { Appointment } from '../services/appointmentService';
 import { supabase } from '../lib/supabase';
-import { cn } from '../utils/cn';
-import { useAuthStore } from '../stores/authStore';
+import { useCompanyId, useCompany } from '../stores/authStore';
+import { useAppointmentsCache } from '../hooks/useAppointmentsCache';
+import { formatInspectionMessage } from '../utils/whatsapp';
+import { Calendar } from '../components/Calendar';
+import { InspectionModal } from '../components/InspectionModal';
+import { AppointmentModal } from '../modules/agenda/components/AppointmentModal';
+import { AppointmentCard } from '../components/AppointmentCard';
 
 export function SchedulePage() {
-    const { companyId } = useAuthStore();
-    const [appointments, setAppointments] = useState<Appointment[]>([]);
-    const [selectedDate] = useState(startOfToday());
-    const [isLoading, setIsLoading] = useState(true);
-    const [isRefreshing, setIsRefreshing] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const companyId = useCompanyId();
+    const company = useCompany();
+    const [selectedDate, setSelectedDate] = useState(startOfToday());
 
-    const loadAppointments = useCallback(async (showLoading = false) => {
+    // ✅ PHASE 3 & 5: Optimized cache with Multi-tenant security
+    const { appointments, isLoading, error, invalidate, invalidateAll } = useAppointmentsCache(selectedDate, companyId);
+
+    const [allAppointmentsDates, setAllAppointmentsDates] = useState<string[]>([]);
+    const [selectedAppointment, setSelectedAppointment] = useState<any | null>(null);
+    const [isInspectionOpen, setIsInspectionOpen] = useState(false);
+    const [isNewServiceModalOpen, setIsNewServiceModalOpen] = useState(false);
+    const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+    const [selectedReport, setSelectedReport] = useState<any>(null);
+
+    // ✅ PHASE 5: Multi-tenant safety - Invalidate cache immediately on company switch
+    useEffect(() => {
+        if (companyId) invalidateAll();
+    }, [companyId, invalidateAll]);
+
+    const loadAllDates = useCallback(async () => {
         if (!companyId) return;
         try {
-            if (showLoading) setIsLoading(true);
-            else setIsRefreshing(true);
-
-            const dateStr = format(selectedDate, 'yyyy-MM-dd');
-            console.log('[SchedulePage] Loading appointments for:', dateStr);
-
-            const data = await appointmentService.getByDate(dateStr);
-            setAppointments(data);
-            setError(null);
-        } catch (err: any) {
-            console.error('[SchedulePage] Error loading data:', err);
-            setError('Não foi possível carregar os agendamentos. Verifique sua conexão.');
-        } finally {
-            setIsLoading(false);
-            setIsRefreshing(false);
+            const { data } = await supabase.from('appointments').select('scheduled_date').eq('company_id', companyId);
+            if (data) setAllAppointmentsDates(Array.from(new Set(data.map(a => a.scheduled_date))));
+        } catch (err) {
+            console.error('Erro ao carregar datas:', err);
         }
-    }, [selectedDate, companyId]);
+    }, [companyId]);
 
-    // Setup Realtime
+    useEffect(() => {
+        if (companyId) loadAllDates();
+    }, [companyId, loadAllDates]);
+
+    // ✅ Setup Realtime Sync
     useEffect(() => {
         if (!companyId) return;
+        const channel = supabase.channel(`sch_${companyId}`).on('postgres_changes', { event: '*', schema: 'public', table: 'appointments', filter: `company_id=eq.${companyId}` }, () => invalidate()).subscribe();
+        return () => { supabase.removeChannel(channel); };
+    }, [companyId, invalidate]);
 
-        console.log('[SchedulePage] Setting up Realtime for company:', companyId);
+    // ✅ Handlers for AppointmentCard
+    const handleOpenPreview = async (appointment: any) => {
+        const inspection = await inspectionService.getByAppointment(appointment.id);
+        if (inspection) {
+            setSelectedReport(inspection);
+            setSelectedAppointment(appointment); // Sync context
+            setIsPreviewOpen(true);
+        } else {
+            alert('Nenhuma inspeção encontrada.');
+        }
+    };
 
-        const channel = supabase
-            .channel(`schedule_changes_${companyId}`)
-            .on(
-                'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'appointments',
-                    filter: `company_id=eq.${companyId}`
-                },
-                (payload) => {
-                    console.log('[SchedulePage] Realtime event received:', payload.eventType);
-                    // Recarrega os dados em qualquer mudança para garantir consistência total
-                    loadAppointments();
-                }
-            )
-            .subscribe((status) => {
-                console.log('[SchedulePage] Subscribed status:', status);
-                if (status === 'SUBSCRIBED') {
-                    // Carga inicial garantida ao conectar
-                    loadAppointments();
-                }
+    const handleSendReport = async (appointment: any) => {
+        const inspection = await inspectionService.getByAppointment(appointment.id);
+        if (inspection) {
+            const whatsappUrl = formatInspectionMessage({
+                clientName: appointment.clients?.name || 'Cliente',
+                clientPhone: appointment.clients?.phone || '',
+                inspectionId: inspection.id,
+                companyName: company?.name
             });
+            window.open(whatsappUrl, '_blank');
+        } else {
+            alert('Nenhuma inspeção encontrada.');
+        }
+    };
 
-        return () => {
-            console.log('[SchedulePage] Unsubscribing channel');
-            supabase.removeChannel(channel);
-        };
-    }, [companyId, loadAppointments]);
+    const handleOpenInspection = (appointment: any) => {
+        setSelectedAppointment(appointment);
+        setIsInspectionOpen(true);
+    };
 
-    const getStatusInfo = (status: Appointment['status']) => {
-        switch (status) {
-            case 'scheduled': return { color: 'text-blue-400', bg: 'bg-blue-500/10', label: 'Comprometido', icon: Clock };
-            case 'in_progress': return { color: 'text-amber-400', bg: 'bg-amber-500/10', label: 'Em Atendimento', icon: Loader2 };
-            case 'completed': return { color: 'text-emerald-400', bg: 'bg-emerald-500/10', label: 'Concluído', icon: CheckCircle2 };
-            case 'cancelled': return { color: 'text-red-400', bg: 'bg-red-500/10', label: 'Cancelado', icon: XCircle };
-            default: return { color: 'text-gray-400', bg: 'bg-gray-500/10', label: status, icon: Clock };
+    const handleEdit = (appointment: any) => {
+        setSelectedAppointment(appointment);
+        setIsNewServiceModalOpen(true);
+    };
+
+    const handleDelete = async (appointment: any) => {
+        const clientName = appointment.clients?.name || 'este cliente';
+        if (window.confirm(`⚠️ EXCLUSÃO CRÍTICA: Deseja realmente excluir o agendamento de ${clientName}? Esta ação não pode ser desfeita.`)) {
+            try {
+                await appointmentService.delete(appointment.id);
+                invalidate();
+            } catch (err) {
+                console.error('Erro ao excluir agendamento:', err);
+                alert('Erro ao excluir agendamento. Verifique sua conexão.');
+            }
         }
     };
 
     return (
-        <div className="space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="space-y-8 pb-10">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div>
-                    <h1 className="text-3xl font-black bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
-                        Agenda Dinâmica
+                    <h1 className="text-4xl font-black text-white tracking-tight flex items-center gap-3">
+                        <CalendarDays className="text-cyan-500" size={36} />
+                        Agenda <span className="text-gray-500 font-light">Inteligente</span>
                     </h1>
-                    <p className="text-gray-400">
-                        {format(selectedDate, "EEEE, d 'de' MMMM", { locale: ptBR })}
-                    </p>
+                    <p className="text-gray-400 mt-1 font-medium">{format(selectedDate, "EEEE, d 'de' MMMM", { locale: ptBR })}</p>
+                </div>
+                <button
+                    onClick={() => {
+                        setSelectedAppointment(null);
+                        setIsNewServiceModalOpen(true);
+                    }}
+                    className="flex items-center gap-2 bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 text-white px-8 py-3 rounded-2xl font-bold transition-all shadow-[0_0_20px_rgba(6,182,212,0.3)] active:scale-95"
+                >
+                    <Plus size={22} /> Novo Serviço
+                </button>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
+                <div className="xl:col-span-4 space-y-6">
+                    <Calendar selectedDate={selectedDate} onDateSelect={setSelectedDate} appointmentsDates={allAppointmentsDates} />
+                    <div className="bg-white/5 border border-white/10 rounded-3xl p-6 relative overflow-hidden group">
+                        <h3 className="text-gray-400 text-sm font-bold uppercase tracking-widest mb-6">Resumo do Dia</h3>
+                        <div className="grid grid-cols-2 gap-4 relative z-10">
+                            <div className="bg-black/20 rounded-2xl p-4 border border-white/5">
+                                <p className="text-gray-500 text-[10px] font-black uppercase mb-1">Pendentes</p>
+                                <span className="text-3xl font-black text-white">{appointments.filter(a => a.status !== 'completed' && a.status !== 'cancelled').length}</span>
+                            </div>
+                            <div className="bg-black/20 rounded-2xl p-4 border border-white/5">
+                                <p className="text-gray-500 text-[10px] font-black uppercase mb-1">Concluídos</p>
+                                <span className="text-3xl font-black text-emerald-400">{appointments.filter(a => a.status === 'completed').length}</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => loadAppointments()}
-                        disabled={isRefreshing}
-                        className="p-2.5 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all text-gray-400 disabled:opacity-50"
-                        title="Sincronizar manual"
-                    >
-                        <RefreshCw size={20} className={cn(isRefreshing && "animate-spin text-cyan-400")} />
-                    </button>
-                    <button className="flex items-center gap-2 bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 text-white px-6 py-2.5 rounded-xl font-bold transition-all shadow-lg active:scale-95">
-                        <Plus size={20} />
-                        Novo Agendamento
-                    </button>
+                <div className="xl:col-span-8 space-y-6">
+                    {isLoading ? (
+                        <div className="bg-white/5 border border-white/10 rounded-3xl p-20 flex flex-col items-center justify-center animate-pulse">
+                            <Loader2 size={48} className="text-cyan-500 animate-spin mb-4" />
+                            <p className="text-gray-500 font-medium">Carregando serviços...</p>
+                        </div>
+                    ) : error ? (
+                        <div className="bg-red-500/5 border border-red-500/10 rounded-3xl p-12 text-center">
+                            <AlertCircle className="text-red-500 mx-auto mb-4" size={48} />
+                            <h3 className="text-xl font-bold text-white mb-2">Ops! Algum erro ocorreu</h3>
+                            <button onClick={() => invalidate()} className="px-6 py-2 bg-white text-black rounded-xl font-bold mt-4">Tentar Novamente</button>
+                        </div>
+                    ) : appointments.length === 0 ? (
+                        <div className="bg-white/5 border border-white/10 border-dashed rounded-3xl p-20 text-center">
+                            <CalendarIcon size={32} className="text-gray-700 mx-auto mb-6" />
+                            <h3 className="text-xl font-bold text-gray-400">Nenhum serviço agendado</h3>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 gap-4">
+                            {appointments.map((appointment) => (
+                                <AppointmentCard
+                                    key={appointment.id}
+                                    appointment={appointment}
+                                    onOpenPreview={handleOpenPreview}
+                                    onSendReport={handleSendReport}
+                                    onOpenInspection={handleOpenInspection}
+                                    onEdit={handleEdit}
+                                    onDelete={handleDelete}
+                                />
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
 
-            {isLoading ? (
-                <div className="flex flex-col items-center justify-center py-20 animate-pulse">
-                    <Loader2 size={48} className="text-cyan-500 animate-spin mb-4" />
-                    <p className="text-gray-500 font-medium">Sincronizando agendamentos...</p>
-                </div>
-            ) : error ? (
-                <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-8 text-center max-w-2xl mx-auto">
-                    <AlertCircle className="text-red-500 mx-auto mb-4" size={48} />
-                    <h3 className="text-white text-xl font-bold mb-2">Ops! Falha de Conexão</h3>
-                    <p className="text-red-400/80 mb-6">{error}</p>
-                    <button
-                        onClick={() => loadAppointments(true)}
-                        className="bg-white text-black px-6 py-2 rounded-xl font-bold hover:bg-gray-200 transition-colors"
-                    >
-                        Tentar Novamente
-                    </button>
-                </div>
-            ) : appointments.length === 0 ? (
-                <div className="text-center py-20 bg-white/5 border border-white/10 border-dashed rounded-3xl group">
-                    <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-500">
-                        <CalendarIcon size={32} className="text-gray-600" />
-                    </div>
-                    <p className="text-gray-500 font-medium">Nenhum agendamento para este dia.</p>
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    {appointments.map((appointment) => {
-                        const info = getStatusInfo(appointment.status);
-                        return (
-                            <div
-                                key={appointment.id}
-                                className="group bg-white/5 border border-white/10 rounded-2xl p-6 hover:bg-white/[0.08] transition-all duration-300 relative overflow-hidden"
-                            >
-                                <div className={cn("absolute left-0 top-0 bottom-0 w-1", info.bg.replace('bg-', 'bg-').replace('/10', ''))} />
+            <InspectionModal
+                appointment={selectedAppointment}
+                isOpen={isInspectionOpen}
+                onClose={() => { setIsInspectionOpen(false); setSelectedAppointment(null); }}
+                onComplete={() => invalidate()}
+            />
 
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                    <div className="space-y-3">
-                                        <div className="flex items-center gap-3">
-                                            <div className={cn("p-2 rounded-lg", info.bg)}>
-                                                <info.icon size={18} className={info.color} />
-                                            </div>
-                                            <div>
-                                                <h3 className="text-lg font-bold text-white group-hover:text-cyan-400 transition-colors">
-                                                    {appointment.service_type}
-                                                </h3>
-                                                <p className="text-sm text-gray-400 font-medium">
-                                                    {appointment.clients?.name || 'Cliente Geral'}
-                                                </p>
-                                            </div>
-                                        </div>
+            <AppointmentModal
+                isOpen={isNewServiceModalOpen}
+                appointment={selectedAppointment}
+                onClose={() => {
+                    setIsNewServiceModalOpen(false);
+                    setSelectedAppointment(null);
+                }}
+                onSuccess={() => {
+                    invalidate();
+                    setIsNewServiceModalOpen(false);
+                    setSelectedAppointment(null);
+                }}
+                selectedDate={selectedDate}
+            />
 
-                                        <div className="flex flex-wrap items-center gap-4 text-sm">
-                                            <div className="flex items-center gap-2 text-gray-500">
-                                                <Clock size={16} />
-                                                <span>{appointment.scheduled_time}</span>
-                                            </div>
-                                            {appointment.address && (
-                                                <div className="flex items-center gap-2 text-gray-500">
-                                                    <MapPin size={16} />
-                                                    <span className="truncate max-w-[200px]">{appointment.address}</span>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2">
-                                        <span className="text-lg font-black text-white">
-                                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(appointment.price)}
-                                        </span>
-                                        <span className={cn("text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full", info.bg, info.color)}>
-                                            {info.label}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
+            <InspectionModal
+                isOpen={isPreviewOpen}
+                onClose={() => { setIsPreviewOpen(false); setSelectedAppointment(null); }}
+                appointment={selectedAppointment || selectedReport?.appointments}
+                initialData={selectedReport}
+                onComplete={() => invalidate()}
+                readOnly={true}
+            />
         </div>
     );
 }

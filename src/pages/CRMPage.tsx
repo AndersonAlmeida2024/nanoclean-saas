@@ -1,38 +1,42 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { Search, Plus, Loader2, AlertCircle } from 'lucide-react';
-import { clientService } from '../services/clientService';
 import { ClientCard } from '../modules/crm/components/ClientCard';
 import { ClientModal } from '../modules/crm/components/ClientModal';
 import type { Client } from '../modules/crm/types';
+import { useCompanyContext } from '../stores/authStore';
+import { useClientsCache } from '../hooks/useClientsCache';
 
 export function CRMPage() {
-    const [clients, setClients] = useState<Client[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const { companyId, platformContextLoaded } = useCompanyContext();
+
+    // ✅ PERFORMANCE: Using cache hook instead of manual state + useEffect
+    const { clients = [], isLoading, error, invalidate } = useClientsCache(
+        platformContextLoaded ? companyId : null
+    );
+
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedClient, setSelectedClient] = useState<Client | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
 
-    const loadClients = useCallback(async () => {
-        try {
-            setIsLoading(true);
-            const data = await clientService.getAll();
-            setClients((data || []) as Client[]);
-            setError(null);
-        } catch (err) {
-            console.error('Erro ao carregar clientes:', err);
-            setError('Não foi possível carregar os clientes. Verifique sua conexão ou chaves do Supabase.');
-        } finally {
-            setIsLoading(false);
-        }
-    }, []);
+    // ✅ SAFETY GUARD: Prevent crash if cache returns null/undefined for clients when not loading
+    // This check is primarily for when `clients` might be explicitly `null` or `undefined`
+    // from the cache hook *before* the default `[]` is applied, or if the hook
+    // could return `null` for `clients` even when `isLoading` is false (e.g., an error state
+    // where `error` is also set).
+    // Given `clients = []` in destructuring, `!clients` will always be false.
+    // A more robust check might be `if (clients === null && !isLoading && !error)`
+    // but the user's instruction is specific.
+    // For now, we'll add the line as requested, noting its potential redundancy with `clients = []`.
+    if (!clients && !isLoading) return null;
 
-    useEffect(() => {
-        loadClients();
-    }, [loadClients]);
+    const openModal = (client: Client | null = null) => {
+        setSelectedClient(client);
+        setIsModalOpen(true);
+    };
 
-    const filteredClients = clients.filter(client =>
-        client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        client.phone.includes(searchTerm)
+    const filteredClients = (clients || []).filter(client =>
+        client?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        client?.phone?.includes(searchTerm)
     );
 
     return (
@@ -79,7 +83,7 @@ export function CRMPage() {
                     <h3 className="text-white font-semibold mb-2">Ops! Algo deu errado</h3>
                     <p className="text-red-400/80 mb-6">{error}</p>
                     <button
-                        onClick={() => loadClients()}
+                        onClick={() => invalidate()} // ✅ Invalidate cache to retry
                         className="px-6 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-colors"
                     >
                         Tentar Novamente
@@ -89,7 +93,7 @@ export function CRMPage() {
                 <div className="text-center py-20 bg-white/5 border border-white/10 border-dashed rounded-2xl">
                     <p className="text-gray-500 mb-4">Nenhum cliente encontrado.</p>
                     <button
-                        onClick={() => setIsModalOpen(true)}
+                        onClick={() => openModal(null)}
                         className="text-cyan-400 hover:text-cyan-300 font-medium"
                     >
                         + Cadastrar primeiro cliente
@@ -98,15 +102,25 @@ export function CRMPage() {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                     {filteredClients.map((client) => (
-                        <ClientCard key={client.id} client={client} />
+                        <div key={client.id} onClick={() => openModal(client)} className="cursor-pointer">
+                            <ClientCard client={client} />
+                        </div>
                     ))}
                 </div>
             )}
 
             <ClientModal
                 isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                onSuccess={loadClients}
+                onClose={() => {
+                    setIsModalOpen(false);
+                    setSelectedClient(null);
+                }}
+                onSuccess={() => {
+                    invalidate(); // ✅ Invalidate cache to reload data
+                    setIsModalOpen(false);
+                    setSelectedClient(null);
+                }}
+                client={selectedClient}
             />
         </div>
     );

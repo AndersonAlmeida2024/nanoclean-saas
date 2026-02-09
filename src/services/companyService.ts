@@ -6,6 +6,9 @@ export interface Company {
     slug: string;
     company_type: 'matrix' | 'branch';
     parent_company_id: string | null;
+    status: 'active' | 'suspended' | 'trial_expired';
+    subscription_status?: 'trial' | 'active' | 'expired'; // Alias para UI
+    trial_ends_at: string | null;
 }
 
 export interface CompanyMembership {
@@ -21,7 +24,7 @@ export const companyService = {
             const { data, error } = await supabase
                 .from('company_memberships')
                 .select(
-                    `id, company_id, role, companies (id, name, slug, company_type, parent_company_id)`
+                    `id, company_id, role, companies (id, name, slug, company_type, parent_company_id, status, trial_ends_at)`
                 )
                 .eq('status', 'active');
 

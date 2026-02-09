@@ -32,7 +32,7 @@ interface TodayAppointment {
 }
 
 export function DashboardPage() {
-    const { user } = useAuthStore();
+    const { user, activeCompanyId } = useAuthStore();
     const [stats, setStats] = useState<StatsData>({
         revenue: 0,
         activeClients: 0,
@@ -49,23 +49,24 @@ export function DashboardPage() {
     const userName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Usuário';
 
     const loadDashboardData = async () => {
+        if (!activeCompanyId) return;
+
         try {
             setIsLoading(true);
             setError(null);
 
             // Carregar dados em paralelo
+            const today = format(new Date(), 'yyyy-MM-dd');
             const [clients, financeStats, todayAppointments] = await Promise.all([
-                clientService.getAll().catch((err) => { throw err }),
-                transactionService.getStats().catch((err) => { throw err }),
-                appointmentService.getByDate(
-                    format(new Date(), 'yyyy-MM-dd')
-                ).catch((err) => { throw err })
+                clientService.getAll(activeCompanyId).catch((err) => { throw err }),
+                transactionService.getStats(activeCompanyId).catch((err) => { throw err }),
+                appointmentService.getByDate(today, activeCompanyId).catch((err) => { throw err })
             ]);
 
             // Calcular estatísticas
-            const activeClients = clients?.filter((c: { status?: string }) => c.status === 'active').length || 0;
-            const newLeads = clients?.filter((c: { status?: string }) => c.status === 'lead').length || 0;
-            const activeToday = todayAppointments?.filter((a: { status?: string }) => a.status !== 'cancelled') || [];
+            const activeClients = (clients || []).filter((c: { status?: string }) => c.status === 'active').length || 0;
+            const newLeads = (clients || []).filter((c: { status?: string }) => c.status === 'lead').length || 0;
+            const activeToday = (todayAppointments || []).filter((a: { status?: string }) => a.status !== 'cancelled');
 
             setStats({
                 revenue: financeStats.totalIncome || 0,
@@ -113,9 +114,22 @@ export function DashboardPage() {
         }
     };
 
+    // O useEffect principal deve observar a mudança de empresa ou usuário
     useEffect(() => {
-        loadDashboardData();
-    }, []);
+        if (activeCompanyId) {
+            loadDashboardData();
+        } else {
+            // Se não houver empresa ativa, resetar stats para 0 e parar loading
+            setStats({
+                revenue: 0,
+                activeClients: 0,
+                todayServices: 0,
+                pendingServices: 0,
+                newLeads: 0
+            });
+            setIsLoading(false);
+        }
+    }, [activeCompanyId, user]);
 
     const statsCards = [
         {

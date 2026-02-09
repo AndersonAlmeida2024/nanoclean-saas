@@ -1,4 +1,5 @@
 import { MessageCircle, Instagram, Facebook, Phone, Calendar } from 'lucide-react';
+import { memo } from 'react';
 import type { Client } from '../types';
 import { cn } from '../../../utils/cn';
 
@@ -31,7 +32,8 @@ const StatusBadge = ({ status }: { status: Client['status'] }) => {
     );
 };
 
-export function ClientCard({ client }: { client: Client }) {
+// ✅ PERFORMANCE: Memoized to prevent re-renders when parent updates
+export const ClientCard = memo(({ client }: { client: Client }) => {
     return (
         <div className="group bg-white/5 hover:bg-white/[0.07] border border-white/10 rounded-2xl p-5 transition-all duration-300 hover:-translate-y-1">
             <div className="flex items-start justify-between mb-4">
@@ -75,4 +77,12 @@ export function ClientCard({ client }: { client: Client }) {
             </div>
         </div>
     );
-}
+}, (prevProps, nextProps) => {
+    // ✅ Custom comparator: only re-render if client ID changed
+    // This prevents re-renders when other clients in the list update
+    return prevProps.client.id === nextProps.client.id &&
+        prevProps.client.name === nextProps.client.name &&
+        prevProps.client.status === nextProps.client.status;
+});
+
+ClientCard.displayName = 'ClientCard';

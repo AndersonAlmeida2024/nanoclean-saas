@@ -2,10 +2,13 @@ import { supabase } from '../lib/supabase';
 import type { Transaction, CreateTransactionDTO, FinanceStatsData } from '../modules/finance/types/finance.types';
 
 export const transactionService = {
-    async getAll() {
+    async getAll(companyId: string) {
+        if (!companyId) throw new Error('companyId is required');
+
         const { data, error } = await supabase
             .from('transactions')
             .select('*')
+            .eq('company_id', companyId)
             .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -14,9 +17,9 @@ export const transactionService = {
 
     async create(dto: CreateTransactionDTO) {
         const { date, ...rest } = dto;
+        if (!rest.company_id) throw new Error('company_id is required for transactions');
 
         // Map the optional 'date' field (YYYY-MM-DD) to 'created_at' column
-        // If date is provided, we use it. If not, Supabase defaults to now().
         const payload = {
             ...rest,
             ...(date && { created_at: new Date(date).toISOString() })
@@ -41,10 +44,13 @@ export const transactionService = {
         if (error) throw error;
     },
 
-    async getStats(): Promise<FinanceStatsData> {
+    async getStats(companyId: string): Promise<FinanceStatsData> {
+        if (!companyId) throw new Error('companyId is required');
+
         const { data, error } = await supabase
             .from('transactions')
-            .select('type, amount');
+            .select('type, amount')
+            .eq('company_id', companyId);
 
         if (error) throw error;
 

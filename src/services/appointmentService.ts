@@ -6,6 +6,9 @@ export type Appointment = Database['public']['Tables']['appointments']['Row'] & 
         name: string;
         phone: string;
     } | null;
+    service_inspections?: {
+        id: string;
+    }[];
 };
 
 export type AppointmentInsert = Database['public']['Tables']['appointments']['Insert'];
@@ -16,14 +19,20 @@ const APPOINTMENT_SELECT = `
     clients (
         name,
         phone
+    ),
+    service_inspections (
+        id
     )
 `;
 
 export const appointmentService = {
-    async getAll(): Promise<Appointment[]> {
+    async getAll(companyId: string): Promise<Appointment[]> {
+        if (!companyId) throw new Error('companyId is required');
+
         const { data, error } = await supabase
             .from('appointments')
             .select(APPOINTMENT_SELECT)
+            .eq('company_id', companyId)
             .order('scheduled_date', { ascending: true })
             .order('scheduled_time', { ascending: true });
 
@@ -34,11 +43,14 @@ export const appointmentService = {
         return (data as any) || [];
     },
 
-    async getByDate(date: string): Promise<Appointment[]> {
+    async getByDate(date: string, companyId: string): Promise<Appointment[]> {
+        if (!companyId) throw new Error('companyId is required');
+
         const { data, error } = await supabase
             .from('appointments')
             .select(APPOINTMENT_SELECT)
             .eq('scheduled_date', date)
+            .eq('company_id', companyId)
             .order('scheduled_time', { ascending: true });
 
         if (error) {
@@ -63,6 +75,21 @@ export const appointmentService = {
             throw error;
         }
         return data as Appointment;
+    },
+
+    async checkIn(id: string) {
+        const { data, error } = await supabase
+            .from('appointments')
+            .update({ checked_in_at: new Date().toISOString(), status: 'in_progress' })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) {
+            console.error('[appointmentService.checkIn] Error:', error);
+            throw error;
+        }
+        return data;
     },
 
     async update(id: string, updates: AppointmentUpdate) {

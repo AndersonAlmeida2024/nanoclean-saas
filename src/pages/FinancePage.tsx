@@ -11,8 +11,11 @@ import { format, startOfDay, startOfMonth, startOfYear, subMonths, subDays, isWi
 import { ptBR } from 'date-fns/locale';
 import type { Transaction, FinanceStatsData } from '../modules/finance/types/finance.types';
 import { getCategoryMetadata } from '../modules/finance/constants';
+import { useAuthStore } from '../stores/authStore';
+import { useCallback } from 'react';
 
 export function FinancePage() {
+    const { companyId } = useAuthStore();
     const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -27,11 +30,12 @@ export function FinancePage() {
     const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
     const [activePreset, setActivePreset] = useState<string>('Este Mês');
 
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
+        if (!companyId) return;
         try {
             setIsLoading(true);
             setError(null);
-            const data = await transactionService.getAll();
+            const data = await transactionService.getAll(companyId);
             setTransactions((data as unknown as Transaction[]) || []);
         } catch (err) {
             console.error('Erro ao carregar finanças:', err);
@@ -39,11 +43,11 @@ export function FinancePage() {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [companyId]);
 
     useEffect(() => {
         loadData();
-    }, []);
+    }, [loadData]);
 
     // Memoized Filter Logic
     const filteredTransactions = useMemo(() => {

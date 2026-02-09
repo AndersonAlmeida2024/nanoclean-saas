@@ -1,28 +1,64 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { X, User, Phone, Mail, Instagram, MessageCircle, Facebook, Loader2, MapPin, CheckCircle2 } from 'lucide-react';
+import { X, User, Phone, Mail, Instagram, MessageCircle, Facebook, Loader2, MapPin, CheckCircle2, History, FileText, Send } from 'lucide-react';
 import { clientService } from '../../../services/clientService';
-import { useAuthStore } from '../../../stores/authStore';
+import { inspectionService } from '../../../services/inspectionService';
+import { useUser, useCompanyId, useCompany } from '../../../stores/authStore';
+import { InspectionModal } from '../../../components/InspectionModal';
 import { cn } from '../../../utils/cn';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { formatInspectionMessage } from '../../../utils/whatsapp';
 
 interface ClientModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSuccess: () => void;
+    client?: any; // Cliente opcional para modo edição/visualização
 }
 
-export function ClientModal({ isOpen, onClose, onSuccess }: ClientModalProps) {
-    const { user, companyId } = useAuthStore();
+export function ClientModal({ isOpen, onClose, onSuccess, client }: ClientModalProps) {
+    const user = useUser();
+    const companyId = useCompanyId();
+    const company = useCompany();
     const [isLoading, setIsLoading] = useState(false);
+    const [isLoadingHistory, setIsLoadingHistory] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
+    const [activeTab, setActiveTab] = useState<'info' | 'history'>(client ? 'history' : 'info');
+    const [history, setHistory] = useState<any[]>([]);
+
+    // Preview Interno (usando InspectionModal agora)
+    const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+    const [selectedReport, setSelectedReport] = useState<any>(null);
+
     const [formData, setFormData] = useState({
-        name: '',
-        phone: '',
-        email: '',
-        address: '',
-        source: 'whatsapp' as 'whatsapp' | 'instagram' | 'facebook' | 'manual',
-        status: 'lead' as 'lead' | 'active' | 'inactive',
+        name: client?.name || '',
+        phone: client?.phone || '',
+        email: client?.email || '',
+        address: client?.address || '',
+        source: client?.source || 'whatsapp',
+        status: client?.status || 'lead',
     });
+
+    // Carregar histórico se o cliente existir
+    useEffect(() => {
+        if (client?.id) {
+            loadHistory();
+        }
+    }, [client?.id]);
+
+    async function loadHistory() {
+        if (!client?.id) return;
+        try {
+            setIsLoadingHistory(true);
+            const data = await inspectionService.getByClient(client.id);
+            setHistory(data || []);
+        } catch (err) {
+            console.error('Erro ao carregar histórico:', err);
+        } finally {
+            setIsLoadingHistory(false);
+        }
+    }
 
     if (!isOpen) return null;
 
@@ -43,7 +79,11 @@ export function ClientModal({ isOpen, onClose, onSuccess }: ClientModalProps) {
                 address: formData.address.trim() || null
             };
 
-            await clientService.create(dataToSave as any);
+            if (client?.id) {
+                await clientService.update(client.id, dataToSave as any);
+            } else {
+                await clientService.create(dataToSave as any);
+            }
 
             setShowSuccess(true);
 
@@ -53,7 +93,9 @@ export function ClientModal({ isOpen, onClose, onSuccess }: ClientModalProps) {
                 onClose();
                 setTimeout(() => {
                     setShowSuccess(false);
-                    setFormData({ name: '', phone: '', email: '', address: '', source: 'whatsapp', status: 'lead' });
+                    if (!client) {
+                        setFormData({ name: '', phone: '', email: '', address: '', source: 'whatsapp', status: 'lead' });
+                    }
                 }, 500);
             }, 2000);
         } catch (err: any) {
@@ -71,6 +113,18 @@ export function ClientModal({ isOpen, onClose, onSuccess }: ClientModalProps) {
         }
     };
 
+    const handleSendReport = (inspection: any) => {
+        // ✅ PHASE 4: Using centralized WhatsApp logic
+        const whatsappUrl = formatInspectionMessage({
+            clientName: client?.name || formData.name,
+            clientPhone: client?.phone || formData.phone || '',
+            inspectionId: inspection.id,
+            companyName: company?.name
+        });
+
+        window.open(whatsappUrl, '_blank');
+    };
+
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             {/* Overlay */}
@@ -80,7 +134,7 @@ export function ClientModal({ isOpen, onClose, onSuccess }: ClientModalProps) {
             />
 
             {/* Modal */}
-            <div className="relative w-full max-w-lg bg-[#111] border border-white/10 rounded-2xl shadow-2xl p-8 glass overflow-hidden max-h-[90vh] overflow-y-auto">
+            <div className="relative w-full max-w-lg bg-[#111] border border-white/10 rounded-2xl shadow-2xl p-8 glass overflow-hidden max-h-[90vh] overflow-y-auto outline-none">
                 {showSuccess ? (
                     <motion.div
                         initial={{ opacity: 0, scale: 0.9 }}
@@ -111,12 +165,14 @@ export function ClientModal({ isOpen, onClose, onSuccess }: ClientModalProps) {
                         {/* Glow Decor */}
                         <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 blur-[50px] -mr-16 -mt-16" />
 
-                        <div className="flex items-center justify-between mb-8">
+                        <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center gap-3">
                                 <span className="w-10 h-10 rounded-xl bg-cyan-500/20 flex items-center justify-center">
                                     <User className="text-cyan-400" size={20} />
                                 </span>
-                                <h2 className="text-2xl font-bold text-white tracking-tight">Novo Cliente</h2>
+                                <h2 className="text-2xl font-bold text-white tracking-tight">
+                                    {client ? 'Detalhes do Cliente' : 'Novo Cliente'}
+                                </h2>
                             </div>
                             <button
                                 onClick={onClose}
@@ -127,145 +183,246 @@ export function ClientModal({ isOpen, onClose, onSuccess }: ClientModalProps) {
                             </button>
                         </div>
 
-                        <form onSubmit={handleSubmit} className="space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {/* Nome */}
-                                <div className="md:col-span-2">
-                                    <label className="block text-sm text-gray-400 mb-2 font-medium">Nome Completo</label>
-                                    <div className="relative group">
-                                        <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-cyan-400 transition-colors" size={18} />
-                                        <input
-                                            required
-                                            type="text"
-                                            value={formData.name}
-                                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                            placeholder="Ex: Anderson"
-                                            className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white focus:outline-none focus:border-cyan-500/50 transition-all font-medium"
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Telefone */}
-                                <div>
-                                    <label className="block text-sm text-gray-400 mb-2 font-medium">Telefone / WhatsApp</label>
-                                    <div className="relative group">
-                                        <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-cyan-400 transition-colors" size={18} />
-                                        <input
-                                            required
-                                            type="tel"
-                                            value={formData.phone}
-                                            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                                            placeholder="(47) 99999-9999"
-                                            className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white focus:outline-none focus:border-cyan-500/50 transition-all font-medium"
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Email */}
-                                <div>
-                                    <label className="block text-sm text-gray-400 mb-2 font-medium">E-mail (opcional)</label>
-                                    <div className="relative group">
-                                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-cyan-400 transition-colors" size={18} />
-                                        <input
-                                            type="email"
-                                            value={formData.email}
-                                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                            placeholder="anderson@email.com"
-                                            className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white focus:outline-none focus:border-cyan-500/50 transition-all font-medium"
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Endereço */}
-                                <div className="md:col-span-2">
-                                    <label className="block text-sm text-gray-400 mb-2 font-medium">Endereço de Atendimento</label>
-                                    <div className="relative group">
-                                        <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-cyan-400 transition-colors" size={18} />
-                                        <input
-                                            type="text"
-                                            value={formData.address}
-                                            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                                            placeholder="Rua, número, bairro..."
-                                            className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white focus:outline-none focus:border-cyan-500/50 transition-all font-medium"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Origem */}
-                            <div>
-                                <label className="block text-sm text-gray-400 mb-3 font-medium text-center md:text-left">Como ele te conheceu?</label>
-                                <div className="grid grid-cols-4 gap-2">
-                                    {[
-                                        { id: 'whatsapp', icon: MessageCircle, label: 'WhatsApp', color: 'text-green-500' },
-                                        { id: 'instagram', icon: Instagram, label: 'Insta', color: 'text-pink-500' },
-                                        { id: 'facebook', icon: Facebook, label: 'Face', color: 'text-blue-500' },
-                                        { id: 'manual', icon: User, label: 'Manual', color: 'text-gray-400' },
-                                    ].map((src) => (
-                                        <button
-                                            key={src.id}
-                                            type="button"
-                                            onClick={() => setFormData({ ...formData, source: src.id as any })}
-                                            className={cn(
-                                                "flex flex-col items-center justify-center p-3 rounded-xl border transition-all gap-1.5",
-                                                formData.source === src.id
-                                                    ? "bg-cyan-500/20 border-cyan-500/50 scale-105 shadow-lg shadow-cyan-900/20"
-                                                    : "bg-white/5 border-white/5 hover:bg-white/10"
-                                            )}
-                                        >
-                                            <src.icon className={cn(src.color)} size={20} />
-                                            <span className="text-[10px] uppercase font-black tracking-widest">{src.label}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Status */}
-                            <div>
-                                <label className="block text-sm text-gray-400 mb-3 font-medium">Status do Lead</label>
-                                <div className="flex gap-2 p-1 bg-black/40 border border-white/10 rounded-xl">
-                                    {['lead', 'active', 'inactive'].map((status) => (
-                                        <button
-                                            key={status}
-                                            type="button"
-                                            onClick={() => setFormData({ ...formData, status: status as any })}
-                                            className={cn(
-                                                "flex-1 py-2 rounded-lg text-sm font-bold uppercase tracking-tight transition-all",
-                                                formData.status === status
-                                                    ? "bg-cyan-500 text-white shadow-lg shadow-cyan-900/40"
-                                                    : "text-gray-500 hover:text-gray-300"
-                                            )}
-                                        >
-                                            {status === 'lead' ? 'Lead' : status === 'active' ? 'Ativo' : 'Inativo'}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div className="pt-4 flex gap-3">
+                        {/* Tabs */}
+                        <div className="flex gap-2 p-1 bg-white/5 rounded-xl mb-8">
+                            <button
+                                onClick={() => setActiveTab('info')}
+                                className={cn(
+                                    "flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-bold transition-all",
+                                    activeTab === 'info' ? "bg-cyan-500 text-white shadow-lg" : "text-gray-500 hover:text-gray-300"
+                                )}
+                            >
+                                <User size={16} /> Informações
+                            </button>
+                            {client && (
                                 <button
-                                    type="button"
-                                    onClick={onClose}
-                                    className="flex-1 py-4 bg-white/5 hover:bg-white/10 text-white rounded-xl font-bold transition-all border border-white/5"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={isLoading}
-                                    className="flex-[2] py-4 bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 text-white rounded-xl font-black text-lg transition-all shadow-xl shadow-cyan-900/40 flex items-center justify-center gap-2 disabled:opacity-50"
-                                >
-                                    {isLoading ? (
-                                        <Loader2 className="animate-spin" size={24} />
-                                    ) : (
-                                        'Salvar Cliente'
+                                    onClick={() => setActiveTab('history')}
+                                    className={cn(
+                                        "flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-bold transition-all",
+                                        activeTab === 'history' ? "bg-cyan-500 text-white shadow-lg" : "text-gray-500 hover:text-gray-300"
                                     )}
+                                >
+                                    <History size={16} /> Histórico de Limpezas
                                 </button>
+                            )}
+                        </div>
+
+                        {activeTab === 'info' ? (
+                            <form onSubmit={handleSubmit} className="space-y-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {/* Nome */}
+                                    <div className="md:col-span-2">
+                                        <label className="block text-sm text-gray-400 mb-2 font-medium">Nome Completo</label>
+                                        <div className="relative group">
+                                            <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-cyan-400 transition-colors" size={18} />
+                                            <input
+                                                required
+                                                type="text"
+                                                value={formData.name}
+                                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                                placeholder="Ex: Anderson"
+                                                className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white focus:outline-none focus:border-cyan-500/50 transition-all font-medium"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Telefone */}
+                                    <div>
+                                        <label className="block text-sm text-gray-400 mb-2 font-medium">Telefone / WhatsApp</label>
+                                        <div className="relative group">
+                                            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-cyan-400 transition-colors" size={18} />
+                                            <input
+                                                required
+                                                type="tel"
+                                                value={formData.phone}
+                                                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                                placeholder="(47) 99999-9999"
+                                                className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white focus:outline-none focus:border-cyan-500/50 transition-all font-medium"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Email */}
+                                    <div>
+                                        <label className="block text-sm text-gray-400 mb-2 font-medium">E-mail (opcional)</label>
+                                        <div className="relative group">
+                                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-cyan-400 transition-colors" size={18} />
+                                            <input
+                                                type="email"
+                                                value={formData.email}
+                                                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                                placeholder="anderson@email.com"
+                                                className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white focus:outline-none focus:border-cyan-500/50 transition-all font-medium"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Endereço */}
+                                    <div className="md:col-span-2">
+                                        <label className="block text-sm text-gray-400 mb-2 font-medium">Endereço de Atendimento</label>
+                                        <div className="relative group">
+                                            <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-cyan-400 transition-colors" size={18} />
+                                            <input
+                                                type="text"
+                                                value={formData.address}
+                                                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                                                placeholder="Rua, número, bairro..."
+                                                className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white focus:outline-none focus:border-cyan-500/50 transition-all font-medium"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Origem */}
+                                <div>
+                                    <label className="block text-sm text-gray-400 mb-3 font-medium text-center md:text-left">Como ele te conheceu?</label>
+                                    <div className="grid grid-cols-4 gap-2">
+                                        {[
+                                            { id: 'whatsapp', icon: MessageCircle, label: 'WhatsApp', color: 'text-green-500' },
+                                            { id: 'instagram', icon: Instagram, label: 'Insta', color: 'text-pink-500' },
+                                            { id: 'facebook', icon: Facebook, label: 'Face', color: 'text-blue-500' },
+                                            { id: 'manual', icon: User, label: 'Manual', color: 'text-gray-400' },
+                                        ].map((src) => (
+                                            <button
+                                                key={src.id}
+                                                type="button"
+                                                onClick={() => setFormData({ ...formData, source: src.id as any })}
+                                                className={cn(
+                                                    "flex flex-col items-center justify-center p-3 rounded-xl border transition-all gap-1.5",
+                                                    formData.source === src.id
+                                                        ? "bg-cyan-500/20 border-cyan-500/50 scale-105 shadow-lg shadow-cyan-900/20"
+                                                        : "bg-white/5 border-white/5 hover:bg-white/10"
+                                                )}
+                                            >
+                                                <src.icon className={cn(src.color)} size={20} />
+                                                <span className="text-[10px] uppercase font-black tracking-widest">{src.label}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Status */}
+                                <div>
+                                    <label className="block text-sm text-gray-400 mb-3 font-medium">Status do Lead</label>
+                                    <div className="flex gap-2 p-1 bg-black/40 border border-white/10 rounded-xl">
+                                        {['lead', 'active', 'inactive'].map((status) => (
+                                            <button
+                                                key={status}
+                                                type="button"
+                                                onClick={() => setFormData({ ...formData, status: status as any })}
+                                                className={cn(
+                                                    "flex-1 py-2 rounded-lg text-sm font-bold uppercase tracking-tight transition-all",
+                                                    formData.status === status
+                                                        ? "bg-cyan-500 text-white shadow-lg shadow-cyan-900/40"
+                                                        : "text-gray-500 hover:text-gray-300"
+                                                )}
+                                            >
+                                                {status === 'lead' ? 'Lead' : status === 'active' ? 'Ativo' : 'Inativo'}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="pt-4 flex gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={onClose}
+                                        className="flex-1 py-4 bg-white/5 hover:bg-white/10 text-white rounded-xl font-bold transition-all border border-white/5"
+                                    >
+                                        {client ? 'Fechar' : 'Cancelar'}
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={isLoading}
+                                        className="flex-[2] py-4 bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 text-white rounded-xl font-black text-lg transition-all shadow-xl shadow-cyan-900/40 flex items-center justify-center gap-2 disabled:opacity-50"
+                                    >
+                                        {isLoading ? (
+                                            <Loader2 className="animate-spin" size={24} />
+                                        ) : (
+                                            client ? 'Atualizar Dados' : 'Salvar Cliente'
+                                        )}
+                                    </button>
+                                </div>
+                            </form>
+                        ) : (
+                            <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+                                {isLoadingHistory ? (
+                                    <div className="flex items-center justify-center py-20">
+                                        <Loader2 className="animate-spin text-cyan-500" size={32} />
+                                    </div>
+                                ) : history.length === 0 ? (
+                                    <div className="text-center py-20 border border-dashed border-white/10 rounded-2xl bg-white/5">
+                                        <History size={48} className="mx-auto text-gray-600 mb-4 opacity-50" />
+                                        <p className="text-gray-500 font-bold">Nenhuma limpeza registrada ainda.</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {history.map((item) => (
+                                            <div
+                                                key={item.id}
+                                                className="group relative bg-white/5 border border-white/5 hover:border-cyan-500/30 rounded-2xl p-4 transition-all"
+                                            >
+                                                <div className="flex items-start justify-between">
+                                                    <div className="flex gap-3">
+                                                        <div className="w-12 h-12 bg-cyan-500/10 rounded-xl flex items-center justify-center shrink-0">
+                                                            <FileText className="text-cyan-400" size={20} />
+                                                        </div>
+                                                        <div>
+                                                            <h4 className="font-bold text-white capitalize">{item.items?.item_type || 'Serviço'}</h4>
+                                                            <p className="text-xs text-gray-500 font-medium">
+                                                                {format(new Date(item.created_at), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                                                            </p>
+                                                            <div className="flex flex-wrap gap-1 mt-2">
+                                                                {item.items?.issues?.map((issue: string) => (
+                                                                    <span key={issue} className="text-[10px] bg-red-500/10 text-red-400 border border-red-500/20 px-1.5 py-0.5 rounded uppercase font-black">
+                                                                        {issue}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setSelectedReport(item);
+                                                                setIsPreviewOpen(true);
+                                                            }}
+                                                            className="p-2 bg-white/5 hover:bg-white/10 text-gray-400 rounded-lg flex items-center gap-2 border border-white/5 transition-colors"
+                                                            title="Visualizar Resumo"
+                                                        >
+                                                            <FileText size={16} /> Resumo
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleSendReport(item);
+                                                            }}
+                                                            className="p-2 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 rounded-lg flex items-center gap-2 border border-cyan-500/10 transition-colors"
+                                                            title="Enviar via WhatsApp"
+                                                        >
+                                                            <Send size={16} /> Enviar
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
-                        </form>
+                        )}
                     </>
                 )}
             </div>
+
+            <InspectionModal
+                isOpen={isPreviewOpen}
+                onClose={() => setIsPreviewOpen(false)}
+                appointment={{ ...selectedReport?.appointments, clients: client }}
+                initialData={selectedReport}
+                onComplete={loadHistory}
+                readOnly={true}
+            />
         </div>
     );
 }

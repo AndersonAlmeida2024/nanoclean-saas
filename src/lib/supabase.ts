@@ -35,6 +35,7 @@ export interface Database {
                     company_type: 'matrix' | 'branch';
                     status: 'active' | 'suspended' | 'trial_expired';
                     plan_id: string;
+                    trial_ends_at: string | null;
                     created_at: string;
                 };
             };
@@ -91,6 +92,7 @@ export interface Database {
                     user_id: string;
                     company_id: string;
                     public_token: string;
+                    checked_in_at: string | null;
                 };
                 Insert: Omit<Database['public']['Tables']['appointments']['Row'], 'id' | 'created_at'>;
                 Update: Partial<Database['public']['Tables']['appointments']['Insert']>;
@@ -107,6 +109,21 @@ export interface Database {
                     user_id: string;
                     company_id: string;
                 };
+            };
+            service_inspections: {
+                Row: {
+                    id: string;
+                    appointment_id: string;
+                    company_id: string;
+                    items: any;
+                    photos_before: string[];
+                    photos_after: string[];
+                    customer_signature: string | null;
+                    created_at: string;
+                    updated_at: string;
+                };
+                Insert: Omit<Database['public']['Tables']['service_inspections']['Row'], 'id' | 'created_at' | 'updated_at'>;
+                Update: Partial<Database['public']['Tables']['service_inspections']['Insert']>;
             };
         };
     };
