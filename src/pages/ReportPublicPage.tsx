@@ -5,7 +5,6 @@ import {
     CheckCircle2,
     AlertCircle,
     Calendar,
-    Clock,
     Sofa,
     Camera,
     Download,
@@ -13,9 +12,7 @@ import {
     AlertTriangle
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { cn } from '../utils/cn';
 import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 
 export function ReportPublicPage() {
     const { id } = useParams();

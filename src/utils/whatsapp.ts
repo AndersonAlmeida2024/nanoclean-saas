@@ -7,8 +7,6 @@
  * - URL encoding for proper link formatting
  */
 
-import type { Company } from '../services/companyService';
-
 interface InspectionMessageParams {
     clientName: string;
     clientPhone: string;
