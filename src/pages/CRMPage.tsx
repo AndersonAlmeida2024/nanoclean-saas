@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Search, Plus, Loader2, AlertCircle } from 'lucide-react';
 import { ClientCard } from '../modules/crm/components/ClientCard';
 import { ClientModal } from '../modules/crm/components/ClientModal';
@@ -18,26 +18,26 @@ export function CRMPage() {
     const [selectedClient, setSelectedClient] = useState<Client | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
 
-    // ✅ SAFETY GUARD: Prevent crash if cache returns null/undefined for clients when not loading
-    // This check is primarily for when `clients` might be explicitly `null` or `undefined`
-    // from the cache hook *before* the default `[]` is applied, or if the hook
-    // could return `null` for `clients` even when `isLoading` is false (e.g., an error state
-    // where `error` is also set).
-    // Given `clients = []` in destructuring, `!clients` will always be false.
-    // A more robust check might be `if (clients === null && !isLoading && !error)`
-    // but the user's instruction is specific.
-    // For now, we'll add the line as requested, noting its potential redundancy with `clients = []`.
-    if (!clients && !isLoading) return null;
-
     const openModal = (client: Client | null = null) => {
         setSelectedClient(client);
         setIsModalOpen(true);
     };
 
-    const filteredClients = (clients || []).filter(client =>
-        client?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        client?.phone?.includes(searchTerm)
-    );
+    // ✅ PERFORMANCE: Memoizing filtered list to prevent O(N) filtering on every render.
+    // Also pre-calculates search lower case once to avoid repeated toLowerCase() calls in the loop.
+    const filteredClients = useMemo(() => {
+        const clientList = clients || [];
+        if (!searchTerm) return clientList;
+
+        const searchLower = searchTerm.toLowerCase();
+        return clientList.filter(client =>
+            client?.name?.toLowerCase().includes(searchLower) ||
+            client?.phone?.includes(searchTerm)
+        );
+    }, [clients, searchTerm]);
+
+    // ✅ SAFETY GUARD: Prevent rendering if clients data is missing and not loading.
+    if (!clients && !isLoading) return null;
 
     return (
         <div className="space-y-8">
