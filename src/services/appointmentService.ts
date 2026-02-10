@@ -16,6 +16,7 @@ export type AppointmentUpdate = Database['public']['Tables']['appointments']['Up
 
 const APPOINTMENT_SELECT = `
     *,
+    public_token,
     clients (
         name,
         phone

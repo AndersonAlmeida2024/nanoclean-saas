@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import {
     Sparkles,
     CheckCircle2,
@@ -16,6 +16,8 @@ import { format } from 'date-fns';
 
 export function ReportPublicPage() {
     const { id } = useParams();
+    const [searchParams] = useSearchParams();
+    const token = searchParams.get('token');
     const [loading, setLoading] = useState(true);
     const [report, setReport] = useState<any>(null);
     const [error, setError] = useState<string | null>(null);
@@ -23,7 +25,7 @@ export function ReportPublicPage() {
     useEffect(() => {
         async function fetchReport() {
             try {
-                const { data, error } = await supabase
+                const { data, error: fetchError } = await supabase
                     .from('service_inspections')
                     .select(`
                         *,
@@ -31,14 +33,20 @@ export function ReportPublicPage() {
                             service_type,
                             scheduled_date,
                             scheduled_time,
+                            public_token,
                             clients (name)
                         )
                     `)
                     .eq('id', id)
                     .single();
 
-                if (error) throw error;
+                if (fetchError) throw fetchError;
                 if (!data) throw new Error('Laudo não encontrado.');
+
+                // ✅ SECURITY: Verify public_token from URL against database record
+                if (!token || data.appointments?.public_token !== token) {
+                    throw new Error('Acesso negado. Token de segurança inválido.');
+                }
 
                 setReport(data);
             } catch (err: any) {
@@ -50,7 +58,7 @@ export function ReportPublicPage() {
         }
 
         if (id) fetchReport();
-    }, [id]);
+    }, [id, token]);
 
     const handlePrint = () => window.print();
 

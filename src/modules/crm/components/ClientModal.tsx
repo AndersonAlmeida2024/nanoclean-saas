@@ -119,6 +119,7 @@ export function ClientModal({ isOpen, onClose, onSuccess, client }: ClientModalP
             clientName: client?.name || formData.name,
             clientPhone: client?.phone || formData.phone || '',
             inspectionId: inspection.id,
+            publicToken: inspection.appointments?.public_token,
             companyName: company?.name
         });
 
