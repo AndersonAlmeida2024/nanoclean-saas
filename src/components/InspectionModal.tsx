@@ -53,6 +53,8 @@ export function InspectionModal({ appointment, isOpen, onClose, onComplete, read
         }
     }, [initialData]);
 
+    const [uploadingPhoto, setUploadingPhoto] = useState<boolean>(false);
+
     if (!isOpen) return null;
 
     const toggleIssue = (issue: string) => {
@@ -60,8 +62,6 @@ export function InspectionModal({ appointment, isOpen, onClose, onComplete, read
             prev.includes(issue) ? prev.filter(i => i !== issue) : [...prev, issue]
         );
     };
-
-    const [uploadingPhoto, setUploadingPhoto] = useState<boolean>(false);
 
     const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'before' | 'after') => {
         const file = e.target.files?.[0];
