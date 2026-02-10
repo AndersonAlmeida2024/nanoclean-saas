@@ -12,17 +12,17 @@ import {
     CheckSquare
 } from 'lucide-react';
 import { SignatureCanvas } from './SignatureCanvas';
-import { inspectionService } from '../services/inspectionService';
-import { appointmentService } from '../services/appointmentService';
+import { inspectionService, type ServiceInspection } from '../services/inspectionService';
+import { appointmentService, type Appointment } from '../services/appointmentService';
 import { cn } from '../utils/cn';
 
 interface InspectionModalProps {
-    appointment: any;
+    appointment: Appointment | any;
     isOpen: boolean;
     onClose: () => void;
     onComplete: () => void;
     readOnly?: boolean;
-    initialData?: any;
+    initialData?: ServiceInspection | null;
 }
 
 type Step = 'checklist' | 'photos_before' | 'photos_after' | 'signature';
@@ -68,9 +68,12 @@ export function InspectionModal({ appointment, isOpen, onClose, onComplete, read
         if (file) {
             setUploadingPhoto(true);
             try {
-                if (!appointment || !appointment.company_id) {
-                    console.error('[InspectionModal] Upload failed: Missing appointment.company_id', appointment);
-                    alert('Erro: ID da empresa não encontrado no agendamento. Tente recarregar a página.');
+                const companyId = appointment?.company_id;
+                const appointmentId = appointment?.id;
+
+                if (!companyId || !appointmentId) {
+                    console.error('[InspectionModal] Upload failed: Missing IDs', { companyId, appointmentId });
+                    alert('Erro: Dados do agendamento incompletos. Tente recarregar a página.');
                     return;
                 }
 
@@ -79,15 +82,16 @@ export function InspectionModal({ appointment, isOpen, onClose, onComplete, read
                 const safeFileName = `${Date.now()}_${type}.${fileExt}`;
 
                 // Path seguro: company_id/appointment_id/type/filename
-                const path = `${appointment.company_id}/${appointment.id}/${type}/${safeFileName}`;
+                const path = `${companyId}/${appointmentId}/${type}/${safeFileName}`;
                 console.log('[InspectionModal] Uploading to path:', path);
                 const publicUrl = await inspectionService.uploadPhoto(file, path);
 
                 if (type === 'before') setPhotosBefore(prev => [...prev, publicUrl]);
                 else setPhotosAfter(prev => [...prev, publicUrl]);
-            } catch (err: any) {
+            } catch (err) {
+                const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
                 console.error('[InspectionModal] Full upload error:', err);
-                alert(`Erro ao enviar foto: ${err.message || 'Verifique as permissões do storage.'}`);
+                alert(`Erro ao enviar foto: ${errorMessage}`);
             } finally {
                 setUploadingPhoto(false);
             }

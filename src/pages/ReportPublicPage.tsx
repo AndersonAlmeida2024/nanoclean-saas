@@ -14,12 +14,14 @@ import {
 import { supabase } from '../lib/supabase';
 import { format } from 'date-fns';
 
+import { type ServiceInspection } from '../services/inspectionService';
+
 export function ReportPublicPage() {
     const { id } = useParams();
     const [searchParams] = useSearchParams();
     const token = searchParams.get('token');
     const [loading, setLoading] = useState(true);
-    const [report, setReport] = useState<any>(null);
+    const [report, setReport] = useState<ServiceInspection | any>(null);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
@@ -44,14 +46,16 @@ export function ReportPublicPage() {
                 if (!data) throw new Error('Laudo não encontrado.');
 
                 // ✅ SECURITY: Verify public_token from URL against database record
-                if (!token || data.appointments?.public_token !== token) {
+                const dbToken = (data as any).appointments?.public_token;
+                if (!token || dbToken !== token) {
                     throw new Error('Acesso negado. Token de segurança inválido.');
                 }
 
                 setReport(data);
-            } catch (err: any) {
+            } catch (err) {
                 console.error('Error fetching report:', err);
-                setError('Este laudo não foi encontrado ou está inacessível.');
+                const msg = err instanceof Error ? err.message : 'Este laudo não foi encontrado ou está inacessível.';
+                setError(msg);
             } finally {
                 setLoading(false);
             }
