@@ -19,15 +19,34 @@ import {
 } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { inspectionService } from '../services/inspectionService';
+import type { Appointment } from '../services/appointmentService';
 
 interface AppointmentCardProps {
-    appointment: any;
-    onOpenPreview: (appointment: any) => void;
-    onSendReport: (appointment: any) => void;
-    onOpenInspection: (appointment: any) => void;
-    onEdit?: (appointment: any) => void;
-    onDelete?: (appointment: any) => void;
+    appointment: Appointment;
+    onOpenPreview: (appointment: Appointment) => void;
+    onSendReport: (appointment: Appointment) => void;
+    onOpenInspection: (appointment: Appointment) => void;
+    onEdit?: (appointment: Appointment) => void;
+    onDelete?: (appointment: Appointment) => void;
 }
+
+const getStatusInfo = (status: string) => {
+    switch (status) {
+        case 'scheduled': return { color: 'text-cyan-400', bg: 'bg-cyan-500/10', label: 'Agendado', icon: Clock };
+        case 'in_progress': return { color: 'text-amber-400', bg: 'bg-amber-500/10', label: 'Em Andamento', icon: Loader2 };
+        case 'completed': return { color: 'text-emerald-400', bg: 'bg-emerald-500/10', label: 'Concluído', icon: CheckCircle2 };
+        case 'cancelled': return { color: 'text-red-400', bg: 'bg-red-500/10', label: 'Cancelado', icon: XCircle };
+        default: return { color: 'text-gray-400', bg: 'bg-gray-500/10', label: status, icon: AlertCircle };
+    }
+};
+
+const getServiceIcon = (type: string) => {
+    const lowerType = type?.toLowerCase() || '';
+    if (lowerType.includes('sofá') || lowerType.includes('sofa')) return Sofa;
+    if (lowerType.includes('tapete') || lowerType.includes('rug')) return Layout;
+    if (lowerType.includes('cadeira') || lowerType.includes('chair')) return CheckSquare;
+    return ClipboardCheck;
+};
 
 export const AppointmentCard = memo(({
     appointment,
@@ -37,41 +56,33 @@ export const AppointmentCard = memo(({
     onEdit,
     onDelete
 }: AppointmentCardProps) => {
-    const [hasInspectionCheck, setHasInspectionCheck] = useState(appointment.has_inspection);
+    const [extraInspectionCheck, setExtraInspectionCheck] = useState(false);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
 
+    // Reset menu state and extra check when appointment changes
+    const [prevId, setPrevId] = useState(appointment.id);
+    if (appointment.id !== prevId) {
+        setIsMenuOpen(false);
+        setExtraInspectionCheck(false);
+        setPrevId(appointment.id);
+    }
+
     useEffect(() => {
-        setIsMenuOpen(false); // Reset menu state on appointment change
         // If the flag is false but status is completed, double check from DB
         if (appointment.status === 'completed' && !appointment.has_inspection) {
             inspectionService.getByAppointment(appointment.id).then(ins => {
-                if (ins) setHasInspectionCheck(true);
+                if (ins) setExtraInspectionCheck(true);
             }).catch(err => console.error('[AppointmentCard] Inspection check failed', err));
-        } else {
-            setHasInspectionCheck(appointment.has_inspection);
         }
     }, [appointment.id, appointment.status, appointment.has_inspection]);
 
-    const getStatusInfo = (status: string) => {
-        switch (status) {
-            case 'scheduled': return { color: 'text-cyan-400', bg: 'bg-cyan-500/10', label: 'Agendado', icon: Clock };
-            case 'in_progress': return { color: 'text-amber-400', bg: 'bg-amber-500/10', label: 'Em Andamento', icon: Loader2 };
-            case 'completed': return { color: 'text-emerald-400', bg: 'bg-emerald-500/10', label: 'Concluído', icon: CheckCircle2 };
-            case 'cancelled': return { color: 'text-red-400', bg: 'bg-red-500/10', label: 'Cancelado', icon: XCircle };
-            default: return { color: 'text-gray-400', bg: 'bg-gray-500/10', label: status, icon: AlertCircle };
-        }
-    };
-
-    const getServiceIcon = (type: string) => {
-        const lowerType = type?.toLowerCase() || '';
-        if (lowerType.includes('sofá') || lowerType.includes('sofa')) return Sofa;
-        if (lowerType.includes('tapete') || lowerType.includes('rug')) return Layout;
-        if (lowerType.includes('cadeira') || lowerType.includes('chair')) return CheckSquare;
-        return ClipboardCheck;
-    };
-
+    const hasInspection = appointment.has_inspection || extraInspectionCheck;
     const statusInfo = getStatusInfo(appointment.status);
-    const ServiceIcon = getServiceIcon(appointment.service_type);
+
+    const renderServiceIcon = () => {
+        const Icon = getServiceIcon(appointment.service_type);
+        return <Icon size={28} className={statusInfo.color} />;
+    };
 
     return (
         <div className={cn(
@@ -92,7 +103,7 @@ export const AppointmentCard = memo(({
                             "w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-lg transition-transform group-hover:rotate-6",
                             statusInfo.bg
                         )}>
-                            <ServiceIcon size={28} className={statusInfo.color} />
+                            {renderServiceIcon()}
                         </div>
                         <div>
                             <h3 className="text-xl font-black text-white group-hover:text-cyan-400 transition-colors">
@@ -155,7 +166,7 @@ export const AppointmentCard = memo(({
                         {/* Actions Logic */}
                         <div className="flex items-center gap-2">
                             <div className="flex gap-2 flex-1">
-                                {hasInspectionCheck ? (
+                                {hasInspection ? (
                                     <>
                                         <button
                                             onClick={(e) => { e.stopPropagation(); onOpenPreview(appointment); }}
