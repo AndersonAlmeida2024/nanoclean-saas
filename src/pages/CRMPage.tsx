@@ -30,10 +30,11 @@ export function CRMPage() {
         if (!searchTerm) return clientList;
 
         const searchLower = searchTerm.toLowerCase();
-        return clientList.filter(client =>
-            client?.name?.toLowerCase().includes(searchLower) ||
-            client?.phone?.includes(searchTerm)
-        );
+        return clientList.filter(client => {
+            const nameMatch = client?.name?.toLowerCase().includes(searchLower) ?? false;
+            const phoneMatch = client?.phone?.includes(searchTerm) ?? false;
+            return nameMatch || phoneMatch;
+        });
     }, [clients, searchTerm]);
 
     // ✅ SAFETY GUARD: Prevent rendering if clients data is missing and not loading.

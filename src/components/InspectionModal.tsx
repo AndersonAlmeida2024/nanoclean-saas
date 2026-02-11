@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
     X,
     Camera,
@@ -43,7 +43,7 @@ export function InspectionModal({ appointment, isOpen, onClose, onComplete, read
     const [signature, setSignature] = useState<string | null>(initialData?.customer_signature || null);
 
     // Sync state with initialData when it changes
-    React.useEffect(() => {
+    useEffect(() => {
         if (initialData) {
             setItemType(initialData.items?.item_type || 'sofa');
             setIssues(initialData.items?.issues || []);
@@ -55,7 +55,7 @@ export function InspectionModal({ appointment, isOpen, onClose, onComplete, read
 
     const [uploadingPhoto, setUploadingPhoto] = useState<boolean>(false);
 
-    if (!isOpen) return null;
+    if (!isOpen || !appointment) return null;
 
     const toggleIssue = (issue: string) => {
         setIssues(prev =>
@@ -148,7 +148,7 @@ export function InspectionModal({ appointment, isOpen, onClose, onComplete, read
                             Ficha de Inspeção
                         </h2>
                         <p className="text-xs text-gray-500 font-medium mt-1">
-                            Agendamento: {appointment.service_type} • {appointment.clients?.name}
+                            Agendamento: {appointment?.service_type} • {appointment?.clients?.name}
                         </p>
                     </div>
                     <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-xl transition-colors text-gray-400">

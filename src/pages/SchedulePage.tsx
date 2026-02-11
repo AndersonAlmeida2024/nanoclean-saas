@@ -180,6 +180,7 @@ export function SchedulePage() {
             </div>
 
             <InspectionModal
+                key={isInspectionOpen ? (selectedAppointment?.id || 'new') : 'closed'}
                 appointment={selectedAppointment}
                 isOpen={isInspectionOpen}
                 onClose={() => { setIsInspectionOpen(false); setSelectedAppointment(null); }}
@@ -187,6 +188,7 @@ export function SchedulePage() {
             />
 
             <AppointmentModal
+                key={isNewServiceModalOpen ? (selectedAppointment?.id || 'new-appt') : 'closed-appt'}
                 isOpen={isNewServiceModalOpen}
                 appointment={selectedAppointment}
                 onClose={() => {
@@ -202,6 +204,7 @@ export function SchedulePage() {
             />
 
             <InspectionModal
+                key={isPreviewOpen ? (selectedReport?.id || 'preview') : 'closed-preview'}
                 isOpen={isPreviewOpen}
                 onClose={() => { setIsPreviewOpen(false); setSelectedAppointment(null); }}
                 appointment={selectedAppointment || selectedReport?.appointments}

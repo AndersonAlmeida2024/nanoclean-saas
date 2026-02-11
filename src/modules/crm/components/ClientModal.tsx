@@ -417,6 +417,7 @@ export function ClientModal({ isOpen, onClose, onSuccess, client }: ClientModalP
             </div>
 
             <InspectionModal
+                key={isPreviewOpen ? (selectedReport?.id || 'preview') : 'closed'}
                 isOpen={isPreviewOpen}
                 onClose={() => setIsPreviewOpen(false)}
                 appointment={{ ...selectedReport?.appointments, clients: client }}
