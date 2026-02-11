@@ -54,10 +54,12 @@ if (!email || !password) {
 
     // Try a dummy auth to check API response
     console.log('   Attempting dummy auth request to check endpoint...');
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const dummyValue = 'dummy-password-123';
+    const dummyCredentials = {
         email: 'check@connectivity.com',
-        password: 'dummy-password-123'
-    });
+        password: dummyValue
+    };
+    const { data, error } = await supabase.auth.signInWithPassword(dummyCredentials);
 
     if (error) {
         if (error.message === 'Invalid login credentials') {

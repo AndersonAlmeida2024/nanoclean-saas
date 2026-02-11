@@ -15,5 +15,17 @@ try {
   )
 } catch (e) {
   console.error('Erro fatal na inicialização:', e);
-  document.body.innerHTML = '<div style="color:white;text-align:center;padding:50px"><h1>Erro Fatal</h1><p>Recarregue a página.</p></div>';
+  const errorDiv = document.createElement('div');
+  errorDiv.setAttribute('style', 'color:white;text-align:center;padding:50px');
+
+  const h1 = document.createElement('h1');
+  h1.textContent = 'Erro Fatal';
+
+  const p = document.createElement('p');
+  p.textContent = 'Recarregue a página.';
+
+  errorDiv.appendChild(h1);
+  errorDiv.appendChild(p);
+
+  document.body.appendChild(errorDiv);
 }
