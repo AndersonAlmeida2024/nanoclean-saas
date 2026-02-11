@@ -145,13 +145,17 @@ Is it actively exploited (EPSS >0.5)?
 
 ## Validation
 
-After your review, run the validation script:
+After your review, run the validation scripts:
 
 ```bash
-python scripts/security_scan.py <project_path> --output summary
+# General security scan
+python .agent/skills/vulnerability-scanner/scripts/security_scan.py <project_path> --output summary
+
+# Specialized backend security scan
+python .agent/skills/vulnerability-scanner/scripts/backend_security_scanner.py <file.ts>
 ```
 
-This validates that security principles were correctly applied.
+These validate that security principles were correctly applied.
 
 ---
 
