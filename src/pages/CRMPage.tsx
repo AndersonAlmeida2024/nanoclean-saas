@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Search, Plus, Loader2, AlertCircle } from 'lucide-react';
 import { ClientCard } from '../modules/crm/components/ClientCard';
 import { ClientModal } from '../modules/crm/components/ClientModal';
-import type { Client } from '../modules/crm/types';
+import { type Client } from '../modules/crm/types';
 import { useCompanyContext } from '../stores/authStore';
 import { useClientsCache } from '../hooks/useClientsCache';
 
@@ -30,8 +30,8 @@ export function CRMPage() {
         if (!searchTerm) return clientList;
 
         const searchLower = searchTerm.toLowerCase();
-        return clientList.filter(client => {
-            const nameMatch = client?.name?.toLowerCase().includes(searchLower) ?? false;
+        return clientList.filter((client: Client) => {
+            const nameMatch = client?.name?.toLowerCase()?.includes(searchLower) ?? false;
             const phoneMatch = client?.phone?.includes(searchTerm) ?? false;
             return nameMatch || phoneMatch;
         });

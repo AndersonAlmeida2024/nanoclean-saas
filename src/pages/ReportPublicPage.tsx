@@ -46,7 +46,7 @@ export function ReportPublicPage() {
                 if (!data) throw new Error('Laudo não encontrado.');
 
                 // ✅ SECURITY: Verify public_token from URL against database record
-                const dbToken = (data as any).appointments?.public_token;
+                const dbToken = (data as any)?.appointments?.public_token;
                 if (!token || dbToken !== token) {
                     throw new Error('Acesso negado. Token de segurança inválido.');
                 }

@@ -64,15 +64,15 @@ export function DashboardPage() {
             ]);
 
             // Calcular estatísticas
-            const activeClients = (clients || []).filter((c: { status?: string }) => c.status === 'active').length || 0;
-            const newLeads = (clients || []).filter((c: { status?: string }) => c.status === 'lead').length || 0;
-            const activeToday = (todayAppointments || []).filter((a: { status?: string }) => a.status !== 'cancelled');
+            const activeClients = (clients || []).filter((c: any) => c?.status === 'active').length || 0;
+            const newLeads = (clients || []).filter((c: any) => c?.status === 'lead').length || 0;
+            const activeToday = (todayAppointments || []).filter((a: any) => a?.status !== 'cancelled');
 
             setStats({
                 revenue: financeStats.totalIncome || 0,
                 activeClients,
                 todayServices: activeToday.length,
-                pendingServices: activeToday.filter((a: { status?: string }) => a.status === 'scheduled').length || 0,
+                pendingServices: activeToday.filter((a: any) => a?.status === 'scheduled').length || 0,
                 newLeads
             });
 
@@ -81,13 +81,8 @@ export function DashboardPage() {
             const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 
             const formattedSchedule: TodayAppointment[] = (todayAppointments || [])
-                .filter((a: { status?: string }) => a.status !== 'cancelled')
-                .map((apt: {
-                    scheduled_time?: string;
-                    clients?: { name?: string } | null;
-                    service_type?: string;
-                    status?: string;
-                }) => {
+                .filter((a: any) => a?.status !== 'cancelled' && a !== null)
+                .map((apt: any) => {
                     const aptTime = apt.scheduled_time || '00:00';
                     let status: 'done' | 'current' | 'pending' = 'pending';
 

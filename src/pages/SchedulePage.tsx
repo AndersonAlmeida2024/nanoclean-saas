@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { Plus, Calendar as CalendarIcon, Loader2, AlertCircle, CalendarDays } from 'lucide-react';
 import { format, startOfToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { inspectionService } from '../services/inspectionService';
-import { appointmentService } from '../services/appointmentService';
+import { inspectionService, type ServiceInspection } from '../services/inspectionService';
+import { appointmentService, type Appointment } from '../services/appointmentService';
 import { supabase } from '../lib/supabase';
 import { useCompanyId, useCompany } from '../stores/authStore';
 import { useAppointmentsCache } from '../hooks/useAppointmentsCache';
@@ -22,11 +22,11 @@ export function SchedulePage() {
     const { appointments, isLoading, error, invalidate, invalidateAll } = useAppointmentsCache(selectedDate, companyId);
 
     const [allAppointmentsDates, setAllAppointmentsDates] = useState<string[]>([]);
-    const [selectedAppointment, setSelectedAppointment] = useState<any | null>(null);
+    const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
     const [isInspectionOpen, setIsInspectionOpen] = useState(false);
     const [isNewServiceModalOpen, setIsNewServiceModalOpen] = useState(false);
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-    const [selectedReport, setSelectedReport] = useState<any>(null);
+    const [selectedReport, setSelectedReport] = useState<ServiceInspection | null>(null);
 
     // ✅ PHASE 5: Multi-tenant safety - Invalidate cache immediately on company switch
     useEffect(() => {
@@ -55,10 +55,10 @@ export function SchedulePage() {
     }, [companyId, invalidate]);
 
     // ✅ Handlers for AppointmentCard
-    const handleOpenPreview = async (appointment: any) => {
+    const handleOpenPreview = async (appointment: Appointment) => {
         const inspection = await inspectionService.getByAppointment(appointment.id);
         if (inspection) {
-            setSelectedReport(inspection);
+            setSelectedReport(inspection as any);
             setSelectedAppointment(appointment); // Sync context
             setIsPreviewOpen(true);
         } else {
@@ -66,7 +66,7 @@ export function SchedulePage() {
         }
     };
 
-    const handleSendReport = async (appointment: any) => {
+    const handleSendReport = async (appointment: Appointment) => {
         const inspection = await inspectionService.getByAppointment(appointment.id);
         if (inspection) {
             const whatsappUrl = formatInspectionMessage({
@@ -82,17 +82,17 @@ export function SchedulePage() {
         }
     };
 
-    const handleOpenInspection = (appointment: any) => {
+    const handleOpenInspection = (appointment: Appointment) => {
         setSelectedAppointment(appointment);
         setIsInspectionOpen(true);
     };
 
-    const handleEdit = (appointment: any) => {
+    const handleEdit = (appointment: Appointment) => {
         setSelectedAppointment(appointment);
         setIsNewServiceModalOpen(true);
     };
 
-    const handleDelete = async (appointment: any) => {
+    const handleDelete = async (appointment: Appointment) => {
         const clientName = appointment.clients?.name || 'este cliente';
         if (window.confirm(`⚠️ EXCLUSÃO CRÍTICA: Deseja realmente excluir o agendamento de ${clientName}? Esta ação não pode ser desfeita.`)) {
             try {

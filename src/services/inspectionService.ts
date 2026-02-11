@@ -11,6 +11,13 @@ export interface ServiceInspection {
     photos_before: string[];
     photos_after: string[];
     customer_signature: string | null;
+    appointments?: {
+        public_token: string;
+        service_type?: string;
+        clients?: {
+            name: string;
+        };
+    };
 }
 
 export const inspectionService = {
@@ -35,7 +42,9 @@ export const inspectionService = {
             .select(`
                 *,
                 appointments (
-                    public_token
+                    public_token,
+                    service_type,
+                    clients (name)
                 )
             `)
             .eq('appointment_id', appointmentId)
@@ -76,7 +85,8 @@ export const inspectionService = {
                     client_id,
                     scheduled_date,
                     service_type,
-                    public_token
+                    public_token,
+                    clients (name)
                 )
             `)
             .eq('appointments.client_id', clientId)
