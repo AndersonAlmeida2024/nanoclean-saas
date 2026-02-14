@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import {
     Sparkles,
     CheckCircle2,
@@ -16,6 +16,9 @@ import { format } from 'date-fns';
 
 export function ReportPublicPage() {
     const { id } = useParams();
+    const [searchParams] = useSearchParams();
+    const token = searchParams.get('token');
+
     const [loading, setLoading] = useState(true);
     const [report, setReport] = useState<any>(null);
     const [error, setError] = useState<string | null>(null);
@@ -23,19 +26,13 @@ export function ReportPublicPage() {
     useEffect(() => {
         async function fetchReport() {
             try {
+                if (!token) throw new Error('Token de acesso ausente.');
+
                 const { data, error } = await supabase
-                    .from('service_inspections')
-                    .select(`
-                        *,
-                        appointments (
-                            service_type,
-                            scheduled_date,
-                            scheduled_time,
-                            clients (name)
-                        )
-                    `)
-                    .eq('id', id)
-                    .single();
+                    .rpc('get_public_inspection', {
+                        p_inspection_id: id,
+                        p_token: token
+                    });
 
                 if (error) throw error;
                 if (!data) throw new Error('Laudo não encontrado.');
@@ -50,7 +47,7 @@ export function ReportPublicPage() {
         }
 
         if (id) fetchReport();
-    }, [id]);
+    }, [id, token]);
 
     const handlePrint = () => window.print();
 
