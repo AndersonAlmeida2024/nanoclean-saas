@@ -73,6 +73,7 @@ export function SchedulePage() {
                 clientName: appointment.clients?.name || 'Cliente',
                 clientPhone: appointment.clients?.phone || '',
                 inspectionId: inspection.id,
+                publicToken: appointment.public_token,
                 companyName: company?.name
             });
             window.open(whatsappUrl, '_blank');
