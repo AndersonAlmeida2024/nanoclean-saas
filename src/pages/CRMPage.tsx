@@ -1,4 +1,3 @@
-```javascript
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Search, Plus, Loader2, AlertCircle, Users, LayoutGrid, List } from 'lucide-react';
 import { clientService } from '../services/clientService';
