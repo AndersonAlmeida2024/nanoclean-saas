@@ -1,5 +1,6 @@
 import { X, Camera, CheckSquare, AlertTriangle, Calendar, Sofa, FileText, Download } from 'lucide-react';
 import { format } from 'date-fns';
+import { getReportLink } from '../utils/whatsapp';
 
 interface ReportPreviewModalProps {
     isOpen: boolean;
@@ -107,7 +108,7 @@ export function ReportPreviewModal({ isOpen, onClose, report }: ReportPreviewMod
                 <div className="p-6 border-t border-white/5 bg-black/40 flex justify-end">
                     <button
                         onClick={() => {
-                            const reportLink = `${window.location.origin}/share/report/${report.id}`;
+                            const reportLink = getReportLink(report.id, report.appointments?.public_token);
                             window.open(reportLink, '_blank');
                         }}
                         className="bg-white/5 hover:bg-white/10 text-white px-6 py-3 rounded-xl font-bold transition-all border border-white/10 flex items-center gap-2"
