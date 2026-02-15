@@ -70,7 +70,8 @@ export const inspectionService = {
                 appointments!inner (
                     client_id,
                     scheduled_date,
-                    service_type
+                    service_type,
+                    public_token
                 )
             `)
             .eq('appointments.client_id', clientId)

@@ -11,6 +11,7 @@ interface InspectionMessageParams {
     clientName: string;
     clientPhone: string;
     inspectionId: string;
+    publicToken?: string;
     companyName: string | null | undefined;
 }
 
@@ -21,11 +22,10 @@ interface InspectionMessageParams {
  * @returns Formatted WhatsApp URL
  */
 export function formatInspectionMessage(params: InspectionMessageParams): string {
-    const { clientName, clientPhone, inspectionId, companyName } = params;
+    const { clientName, clientPhone, inspectionId, publicToken, companyName } = params;
 
-    // ✅ Clean protocol selection based on environment
-    const protocol = window.location.hostname === 'localhost' ? 'http://' : 'https://';
-    const reportLink = `${protocol}${window.location.host}/share/report/${inspectionId}`;
+    // ✅ Use window.location.origin for robust URL generation
+    const reportLink = `${window.location.origin}/share/report/${inspectionId}${publicToken ? `?token=${publicToken}` : ''}`;
 
     // ✅ Company name with safe fallback
     const coName = companyName || 'nossa empresa';
@@ -46,9 +46,9 @@ export function formatInspectionMessage(params: InspectionMessageParams): string
  * Get clean report link for sharing
  * 
  * @param inspectionId - Inspection ID
+ * @param publicToken - Appointment Public Token for security
  * @returns Clean report URL
  */
-export function getReportLink(inspectionId: string): string {
-    const protocol = window.location.hostname === 'localhost' ? 'http://' : 'https://';
-    return `${protocol}${window.location.host}/share/report/${inspectionId}`;
+export function getReportLink(inspectionId: string, publicToken?: string): string {
+    return `${window.location.origin}/share/report/${inspectionId}${publicToken ? `?token=${publicToken}` : ''}`;
 }

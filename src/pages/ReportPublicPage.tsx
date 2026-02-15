@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import {
     Sparkles,
     CheckCircle2,
@@ -20,25 +20,23 @@ export function ReportPublicPage() {
     const [report, setReport] = useState<any>(null);
     const [error, setError] = useState<string | null>(null);
 
+    const [searchParams] = useSearchParams();
+    const token = searchParams.get('token');
+
     useEffect(() => {
         async function fetchReport() {
             try {
+                if (!token) throw new Error('Token de acesso ausente.');
+
+                // Hardening: Usando RPC em vez de select direto para evitar Mass Listing Leaks e validar token
                 const { data, error } = await supabase
-                    .from('service_inspections')
-                    .select(`
-                        *,
-                        appointments (
-                            service_type,
-                            scheduled_date,
-                            scheduled_time,
-                            clients (name)
-                        )
-                    `)
-                    .eq('id', id)
-                    .single();
+                    .rpc('get_public_inspection', {
+                        p_inspection_id: id,
+                        p_token: token
+                    });
 
                 if (error) throw error;
-                if (!data) throw new Error('Laudo não encontrado.');
+                if (!data) throw new Error('Laudo não encontrado ou acesso negado.');
 
                 setReport(data);
             } catch (err: any) {
@@ -50,7 +48,7 @@ export function ReportPublicPage() {
         }
 
         if (id) fetchReport();
-    }, [id]);
+    }, [id, token]);
 
     const handlePrint = () => window.print();
 
