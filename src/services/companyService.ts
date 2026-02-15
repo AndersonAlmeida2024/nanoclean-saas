@@ -14,7 +14,7 @@ export interface Company {
 export interface CompanyMembership {
     id: string;
     company_id: string;
-    role: 'owner' | 'admin' | 'member';
+    role: 'owner' | 'admin' | 'member' | 'technician';
     companies: Company;
 }
 
@@ -24,9 +24,8 @@ export const companyService = {
             const { data, error } = await supabase
                 .from('company_memberships')
                 .select(
-                    `id, company_id, role, companies (id, name, slug, company_type, parent_company_id, status, trial_ends_at)`
-                )
-                .eq('status', 'active');
+                    `id, company_id, role, companies (id, name, slug, parent_company_id, status, trial_ends_at)`
+                );
 
             if (error) {
                 console.error('Erro ao listar empresas:', JSON.stringify(error, null, 2), error);

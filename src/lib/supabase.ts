@@ -45,7 +45,7 @@ export interface Database {
                     user_id: string;
                     company_id: string;
                     role: 'owner' | 'admin' | 'member';
-                    status: 'active' | 'inactive' | 'pending';
+                    is_active: boolean;
                     created_at: string;
                 };
             };

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { X, User, Phone, Mail, Instagram, MessageCircle, Facebook, Loader2, MapPin, CheckCircle2, History, FileText, Send } from 'lucide-react';
 import { clientService } from '../../../services/clientService';
-import { inspectionService } from '../../../services/inspectionService';
+import { appointmentService } from '../../../services/appointmentService';
 import { useUser, useCompanyId, useCompany } from '../../../stores/authStore';
 import { InspectionModal } from '../../../components/InspectionModal';
 import { cn } from '../../../utils/cn';
@@ -40,18 +40,30 @@ export function ClientModal({ isOpen, onClose, onSuccess, client }: ClientModalP
         status: client?.status || 'lead',
     });
 
-    // Carregar histórico se o cliente existir
+    // Carregar histórico e sincronizar dados se o cliente/modal mudar
     useEffect(() => {
-        if (client?.id) {
-            loadHistory();
+        if (isOpen) {
+            setFormData({
+                name: client?.name || '',
+                phone: client?.phone || '',
+                email: client?.email || '',
+                address: client?.address || '',
+                source: client?.source || 'whatsapp',
+                status: client?.status || 'lead',
+            });
+            setActiveTab(client ? 'history' : 'info');
+
+            if (client?.id) {
+                loadHistory();
+            }
         }
-    }, [client?.id]);
+    }, [isOpen, client?.id]);
 
     async function loadHistory() {
         if (!client?.id) return;
         try {
             setIsLoadingHistory(true);
-            const data = await inspectionService.getByClient(client.id);
+            const data = await appointmentService.getByClient(client.id);
             setHistory(data || []);
         } catch (err) {
             console.error('Erro ao carregar histórico:', err);
@@ -119,6 +131,7 @@ export function ClientModal({ isOpen, onClose, onSuccess, client }: ClientModalP
             clientName: client?.name || formData.name,
             clientPhone: client?.phone || formData.phone || '',
             inspectionId: inspection.id,
+            itemType: inspection.items?.item_type,
             companyName: company?.name
         });
 
@@ -162,8 +175,8 @@ export function ClientModal({ isOpen, onClose, onSuccess, client }: ClientModalP
                     </motion.div>
                 ) : (
                     <>
-                        {/* Glow Decor */}
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 blur-[50px] -mr-16 -mt-16" />
+                        {/* Glow Decor - pointer-events-none added to prevent blocking clicks */}
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 blur-[50px] -mr-16 -mt-16 pointer-events-none" />
 
                         <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center gap-3">
@@ -176,7 +189,7 @@ export function ClientModal({ isOpen, onClose, onSuccess, client }: ClientModalP
                             </div>
                             <button
                                 onClick={onClose}
-                                className="p-2 hover:bg-white/5 rounded-lg text-gray-400 transition-colors"
+                                className="w-10 h-10 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-full text-gray-400 hover:text-white transition-all border border-white/5"
                                 title="Fechar"
                             >
                                 <X size={20} />
@@ -189,7 +202,7 @@ export function ClientModal({ isOpen, onClose, onSuccess, client }: ClientModalP
                                 onClick={() => setActiveTab('info')}
                                 className={cn(
                                     "flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-bold transition-all",
-                                    activeTab === 'info' ? "bg-cyan-500 text-white shadow-lg" : "text-gray-500 hover:text-gray-300"
+                                    activeTab === 'info' ? "bg-cyan-500 text-white shadow-lg shadow-cyan-900/40" : "text-gray-500 hover:text-gray-300"
                                 )}
                             >
                                 <User size={16} /> Informações
@@ -199,7 +212,7 @@ export function ClientModal({ isOpen, onClose, onSuccess, client }: ClientModalP
                                     onClick={() => setActiveTab('history')}
                                     className={cn(
                                         "flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-bold transition-all",
-                                        activeTab === 'history' ? "bg-cyan-500 text-white shadow-lg" : "text-gray-500 hover:text-gray-300"
+                                        activeTab === 'history' ? "bg-cyan-500 text-white shadow-lg shadow-cyan-900/40" : "text-gray-500 hover:text-gray-300"
                                     )}
                                 >
                                     <History size={16} /> Histórico de Limpezas
@@ -356,57 +369,71 @@ export function ClientModal({ isOpen, onClose, onSuccess, client }: ClientModalP
                                         <p className="text-gray-500 font-bold">Nenhuma limpeza registrada ainda.</p>
                                     </div>
                                 ) : (
-                                    <div className="space-y-3">
-                                        {history.map((item) => (
-                                            <div
-                                                key={item.id}
-                                                className="group relative bg-white/5 border border-white/5 hover:border-cyan-500/30 rounded-2xl p-4 transition-all"
-                                            >
-                                                <div className="flex items-start justify-between">
-                                                    <div className="flex gap-3">
-                                                        <div className="w-12 h-12 bg-cyan-500/10 rounded-xl flex items-center justify-center shrink-0">
-                                                            <FileText className="text-cyan-400" size={20} />
-                                                        </div>
-                                                        <div>
-                                                            <h4 className="font-bold text-white capitalize">{item.items?.item_type || 'Serviço'}</h4>
-                                                            <p className="text-xs text-gray-500 font-medium">
-                                                                {format(new Date(item.created_at), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
-                                                            </p>
-                                                            <div className="flex flex-wrap gap-1 mt-2">
-                                                                {item.items?.issues?.map((issue: string) => (
-                                                                    <span key={issue} className="text-[10px] bg-red-500/10 text-red-400 border border-red-500/20 px-1.5 py-0.5 rounded uppercase font-black">
-                                                                        {issue}
-                                                                    </span>
-                                                                ))}
+                                    <div className="space-y-3 pb-4">
+                                        {history.map((appointment) => {
+                                            const inspection = appointment.service_inspections?.[0];
+                                            return (
+                                                <div
+                                                    key={appointment.id}
+                                                    className="group bg-white/5 border border-white/5 hover:border-cyan-500/30 rounded-2xl p-5 transition-all hover:bg-white/[0.08]"
+                                                >
+                                                    <div className="flex items-start justify-between gap-4">
+                                                        <div className="flex gap-4">
+                                                            <div className="w-12 h-12 bg-cyan-500/10 rounded-xl flex items-center justify-center shrink-0 border border-cyan-500/20">
+                                                                <FileText className="text-cyan-400" size={20} />
+                                                            </div>
+                                                            <div className="space-y-1">
+                                                                <h4 className="font-bold text-white capitalize text-lg">
+                                                                    {inspection?.items?.item_type || appointment.service_type || 'Serviço'}
+                                                                </h4>
+                                                                <p className="text-xs text-gray-500 font-bold tracking-tight">
+                                                                    {format(new Date(appointment.scheduled_date), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                                                                </p>
+                                                                {inspection?.items?.issues && inspection.items.issues.length > 0 && (
+                                                                    <div className="flex flex-wrap gap-1.5 mt-3">
+                                                                        {inspection.items.issues.map((issue: string) => (
+                                                                            <span key={issue} className="text-[9px] bg-red-500/5 text-red-500/80 border border-red-500/10 px-2 py-0.5 rounded-full uppercase font-black tracking-widest">
+                                                                                {issue}
+                                                                            </span>
+                                                                        ))}
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setSelectedReport(item);
-                                                                setIsPreviewOpen(true);
-                                                            }}
-                                                            className="p-2 bg-white/5 hover:bg-white/10 text-gray-400 rounded-lg flex items-center gap-2 border border-white/5 transition-colors"
-                                                            title="Visualizar Resumo"
-                                                        >
-                                                            <FileText size={16} /> Resumo
-                                                        </button>
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleSendReport(item);
-                                                            }}
-                                                            className="p-2 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 rounded-lg flex items-center gap-2 border border-cyan-500/10 transition-colors"
-                                                            title="Enviar via WhatsApp"
-                                                        >
-                                                            <Send size={16} /> Enviar
-                                                        </button>
+
+                                                        <div className="flex flex-col gap-2 shrink-0">
+                                                            {inspection ? (
+                                                                <>
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setSelectedReport(inspection);
+                                                                            setIsPreviewOpen(true);
+                                                                        }}
+                                                                        className="flex items-center justify-center gap-2 px-3 py-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg text-xs font-bold border border-white/10 transition-all"
+                                                                    >
+                                                                        <FileText size={14} /> Resumo
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            handleSendReport(inspection);
+                                                                        }}
+                                                                        className="flex items-center justify-center gap-2 px-3 py-2 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 rounded-lg text-xs font-black border border-cyan-500/20 transition-all"
+                                                                    >
+                                                                        <Send size={14} /> Enviar
+                                                                    </button>
+                                                                </>
+                                                            ) : (
+                                                                <span className="text-[10px] text-gray-600 font-bold italic py-2">
+                                                                    Sem laudo técnico
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </div>

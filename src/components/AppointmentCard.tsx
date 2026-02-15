@@ -6,19 +6,29 @@ import {
     FileText,
     Send,
     ClipboardCheck,
+    Check,
     Sofa,
     Layout,
-    CheckSquare,
     CheckCircle2,
     Loader2,
     XCircle,
     AlertCircle,
     MoreVertical,
     Trash2,
-    Edit2
+    Edit2,
+    Bell,
+    Calendar as CalendarIcon,
+    Bed,
+    Car,
+    ShieldCheck,
+    Grid
 } from 'lucide-react';
 import { cn } from '../utils/cn';
-import { inspectionService } from '../services/inspectionService';
+import { formatReminderMessage } from '../utils/whatsapp';
+import { generateGoogleCalendarLink } from '../utils/calendar';
+import { addHours, parseISO } from 'date-fns';
+import { useConfirm } from './ConfirmationModal';
+import { useToast } from './Toast';
 
 interface AppointmentCardProps {
     appointment: any;
@@ -27,6 +37,7 @@ interface AppointmentCardProps {
     onOpenInspection: (appointment: any) => void;
     onEdit?: (appointment: any) => void;
     onDelete?: (appointment: any) => void;
+    onStatusUpdate?: (appointment: any, status: string) => void;
 }
 
 export const AppointmentCard = memo(({
@@ -35,28 +46,26 @@ export const AppointmentCard = memo(({
     onSendReport,
     onOpenInspection,
     onEdit,
-    onDelete
+    onDelete,
+    onStatusUpdate
 }: AppointmentCardProps) => {
-    const [hasInspectionCheck, setHasInspectionCheck] = useState(appointment.has_inspection);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const confirm = useConfirm();
+    const toast = useToast();
+
+    // ✅ OPTIMIZED: Use data from joined query or simple flag check
+    // If appointment.service_inspections exists (from join), it has an inspection
+    const hasInspectionCheck = appointment.has_inspection || (appointment.service_inspections && appointment.service_inspections.length > 0);
 
     useEffect(() => {
         setIsMenuOpen(false); // Reset menu state on appointment change
-        // If the flag is false but status is completed, double check from DB
-        if (appointment.status === 'completed' && !appointment.has_inspection) {
-            inspectionService.getByAppointment(appointment.id).then(ins => {
-                if (ins) setHasInspectionCheck(true);
-            }).catch(err => console.error('[AppointmentCard] Inspection check failed', err));
-        } else {
-            setHasInspectionCheck(appointment.has_inspection);
-        }
-    }, [appointment.id, appointment.status, appointment.has_inspection]);
+    }, [appointment.id]);
 
     const getStatusInfo = (status: string) => {
         switch (status) {
             case 'scheduled': return { color: 'text-cyan-400', bg: 'bg-cyan-500/10', label: 'Agendado', icon: Clock };
             case 'in_progress': return { color: 'text-amber-400', bg: 'bg-amber-500/10', label: 'Em Andamento', icon: Loader2 };
-            case 'completed': return { color: 'text-emerald-400', bg: 'bg-emerald-500/10', label: 'Concluído', icon: CheckCircle2 };
+            case 'completed': return { color: 'text-emerald-400', bg: 'bg-emerald-500/10', label: 'Finalizado', icon: CheckCircle2 };
             case 'cancelled': return { color: 'text-red-400', bg: 'bg-red-500/10', label: 'Cancelado', icon: XCircle };
             default: return { color: 'text-gray-400', bg: 'bg-gray-500/10', label: status, icon: AlertCircle };
         }
@@ -65,8 +74,14 @@ export const AppointmentCard = memo(({
     const getServiceIcon = (type: string) => {
         const lowerType = type?.toLowerCase() || '';
         if (lowerType.includes('sofá') || lowerType.includes('sofa')) return Sofa;
-        if (lowerType.includes('tapete') || lowerType.includes('rug')) return Layout;
-        if (lowerType.includes('cadeira') || lowerType.includes('chair')) return CheckSquare;
+        if (lowerType.includes('colchão') || lowerType.includes('colchao')) return Bed;
+        if (lowerType.includes('cadeira') || lowerType.includes('cadeiras')) return Sofa; // Usando Sofa como genérico para estofados
+        if (lowerType.includes('carro') || lowerType.includes('automóvel') || lowerType.includes('veículo')) return Car;
+        if (lowerType.includes('tapete')) return Grid;
+        if (lowerType.includes('impermeabiliza')) return ShieldCheck;
+
+        // Fallbacks
+        if (lowerType.includes('rug')) return Layout;
         return ClipboardCheck;
     };
 
@@ -75,8 +90,9 @@ export const AppointmentCard = memo(({
 
     return (
         <div className={cn(
-            "group relative bg-white/5 hover:bg-white/[0.08] border border-white/10 rounded-3xl p-6 transition-all duration-500 overflow-hidden",
-            "hover:shadow-2xl hover:shadow-cyan-500/10 hover:-translate-y-1"
+            "group relative bg-[#121212] border border-white/10 rounded-3xl p-6 transition-all duration-500",
+            "hover:shadow-2xl hover:shadow-cyan-500/10 hover:-translate-y-1",
+            isMenuOpen ? "z-[100] ring-2 ring-cyan-500/50 shadow-2xl scale-[1.01]" : "z-[10]"
         )}>
             {/* Sidebar Color Badge */}
             <div className={cn(
@@ -128,6 +144,20 @@ export const AppointmentCard = memo(({
                                 </span>
                             </a>
                         )}
+
+                        {appointment.technicians && (
+                            <div className="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-xl border border-white/5">
+                                <div
+                                    className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold text-slate-900 shadow-sm"
+                                    style={{ backgroundColor: appointment.technicians.color }}
+                                >
+                                    {appointment.technicians.name.charAt(0)}
+                                </div>
+                                <span className="text-xs font-bold text-gray-300">
+                                    {appointment.technicians.name}
+                                </span>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -169,14 +199,51 @@ export const AppointmentCard = memo(({
                                         >
                                             <Send size={16} /> Enviar
                                         </button>
+                                        {(appointment.status === 'scheduled' || appointment.status === 'in_progress') && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    confirm({
+                                                        title: 'Finalizar Serviço',
+                                                        message: 'Deseja finalizar este serviço e lançar no financeiro?',
+                                                        onConfirm: () => {
+                                                            onStatusUpdate?.(appointment, 'completed');
+                                                            toast.success('Serviço finalizado com sucesso!');
+                                                        }
+                                                    });
+                                                }}
+                                                className="flex-1 p-2.5 bg-cyan-500 text-black hover:bg-cyan-400 rounded-2xl transition-all flex items-center justify-center gap-2 text-[10px] font-black uppercase shadow-lg shadow-cyan-500/20"
+                                            >
+                                                <Check size={16} /> Finalizar
+                                            </button>
+                                        )}
                                     </>
                                 ) : (appointment.status === 'scheduled' || appointment.status === 'in_progress') ? (
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); onOpenInspection(appointment); }}
-                                        className="w-full p-2.5 bg-gradient-to-r from-cyan-600/20 to-cyan-500/20 hover:from-cyan-600/30 hover:to-cyan-500/30 text-cyan-400 border border-cyan-500/30 rounded-2xl transition-all flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest"
-                                    >
-                                        <ClipboardCheck size={18} /> Iniciar Inspeção
-                                    </button>
+                                    <div className="flex gap-2 w-full">
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); onOpenInspection(appointment); }}
+                                            className="flex-[2] p-2.5 bg-gradient-to-r from-cyan-600/20 to-cyan-500/20 hover:from-cyan-600/30 hover:to-cyan-500/30 text-cyan-400 border border-cyan-500/30 rounded-2xl transition-all flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest"
+                                        >
+                                            <ClipboardCheck size={18} /> Iniciar Inspeção
+                                        </button>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                confirm({
+                                                    title: 'Finalizar Serviço',
+                                                    message: 'Deseja pular a inspeção e finalizar este serviço agora?',
+                                                    onConfirm: () => {
+                                                        onStatusUpdate?.(appointment, 'completed');
+                                                        toast.success('Serviço finalizado com sucesso!');
+                                                    }
+                                                });
+                                            }}
+                                            className="flex-1 p-2.5 bg-white/5 hover:bg-white/10 text-gray-400 border border-white/10 rounded-2xl transition-all flex items-center justify-center gap-2 text-[10px] font-black uppercase hover:text-white"
+                                            title="Finalizar sem inspeção"
+                                        >
+                                            <Check size={16} /> Finalizar
+                                        </button>
+                                    </div>
                                 ) : (
                                     <div className="w-full text-center py-2 text-gray-600 text-[10px] font-black uppercase tracking-widest">
                                         Sem Ações
@@ -204,7 +271,70 @@ export const AppointmentCard = memo(({
                                 {isMenuOpen && (
                                     <>
                                         <div className="fixed inset-0 z-40" onClick={() => setIsMenuOpen(false)} />
-                                        <div className="absolute right-0 bottom-full mb-2 w-48 bg-[#1a1a1a] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200">
+                                        <div className="absolute right-0 top-full mt-2 w-56 bg-[#1a1a1a] border border-white/20 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.8)] z-[110] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setIsMenuOpen(false);
+                                                    const url = formatReminderMessage({
+                                                        clientName: appointment.clients?.name || 'Cliente',
+                                                        clientPhone: appointment.clients?.phone || '',
+                                                        time: appointment.scheduled_time,
+                                                        serviceType: appointment.service_type
+                                                    });
+                                                    window.open(url, '_blank');
+                                                }}
+                                                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-emerald-500/10 text-sm text-gray-300 transition-colors border-b border-white/5"
+                                            >
+                                                <Bell size={16} className="text-emerald-400" />
+                                                Lembrete WhatsApp
+                                            </button>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setIsMenuOpen(false);
+
+                                                    // Montar data/hora para o Google (correção de formato)
+                                                    const cleanTime = appointment.scheduled_time?.split(':').slice(0, 2).join(':') || '09:00';
+                                                    const start = `${appointment.scheduled_date}T${cleanTime}:00`;
+                                                    const startDate = parseISO(start);
+                                                    const end = addHours(startDate, 2).toISOString();
+                                                    const startISO = startDate.toISOString();
+
+                                                    const url = generateGoogleCalendarLink({
+                                                        title: `Limpeza: ${appointment.service_type}`,
+                                                        description: `Atendimento agendado para ${appointment.clients?.name}.`,
+                                                        location: appointment.address || '',
+                                                        startTime: startISO,
+                                                        endTime: end,
+                                                        guestEmail: appointment.clients?.email
+                                                    });
+                                                    window.open(url, '_blank');
+                                                }}
+                                                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-cyan-500/10 text-sm text-gray-300 transition-colors border-b border-white/5"
+                                            >
+                                                <CalendarIcon size={16} className="text-cyan-400" />
+                                                Adicionar à Agenda
+                                            </button>
+                                            {(appointment.status === 'scheduled' || appointment.status === 'in_progress') && (
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setIsMenuOpen(false);
+                                                        confirm({
+                                                            title: 'Finalizar Serviço',
+                                                            message: 'Deseja finalizar este serviço e lançar no financeiro?',
+                                                            onConfirm: () => {
+                                                                onStatusUpdate?.(appointment, 'completed');
+                                                                toast.success('Serviço finalizado com sucesso!');
+                                                            }
+                                                        });
+                                                    }}
+                                                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-cyan-500/10 text-sm text-cyan-400 transition-colors border-b border-white/5"
+                                                >
+                                                    <Check size={16} /> Finalizar Serviço
+                                                </button>
+                                            )}
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
@@ -213,7 +343,7 @@ export const AppointmentCard = memo(({
                                                 }}
                                                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 text-sm text-gray-300 transition-colors border-b border-white/5"
                                             >
-                                                <Edit2 size={16} className="text-cyan-400" />
+                                                <Edit2 size={16} className="text-gray-400" />
                                                 Editar Agendamento
                                             </button>
                                             <button

@@ -77,5 +77,34 @@ export const transactionService = {
         stats.avgTicket = incomeCount > 0 ? stats.totalIncome / incomeCount : 0;
 
         return stats;
+    },
+
+    async getCommissionsByTechnician(companyId: string, technicianId: string, status?: 'pending' | 'paid') {
+        let query = supabase
+            .from('transactions')
+            .select('*')
+            .eq('company_id', companyId)
+            .eq('technician_id', technicianId)
+            .eq('category', 'Comissão');
+
+        if (status) {
+            query = query.eq('status', status);
+        }
+
+        const { data, error } = await query.order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return data as Transaction[];
+    },
+
+    async payCommissions(transactionIds: string[]) {
+        if (!transactionIds.length) return;
+
+        const { error } = await supabase
+            .from('transactions')
+            .update({ status: 'paid' })
+            .in('id', transactionIds);
+
+        if (error) throw error;
     }
 };

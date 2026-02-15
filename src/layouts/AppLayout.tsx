@@ -11,8 +11,8 @@ export function AppLayout() {
             <div className="flex-1 flex relative">
                 <Sidebar />
 
-                <main className="flex-1 pl-[280px] transition-[padding] duration-300 relative z-10 w-full min-h-screen">
-                    <div className="p-8 max-w-7xl mx-auto">
+                <main className="flex-1 pl-0 lg:pl-[280px] pb-[100px] lg:pb-0 transition-[padding] duration-300 relative z-10 w-full min-h-screen">
+                    <div className="p-4 md:p-8 max-w-7xl mx-auto">
                         <TrialGuard>
                             <Outlet />
                         </TrialGuard>

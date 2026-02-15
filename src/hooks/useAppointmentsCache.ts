@@ -25,8 +25,15 @@ export function useAppointmentsCache(selectedDate: Date, companyId: string | nul
     const [error, setError] = useState<string | null>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
 
-    const loadAppointments = useCallback(async () => {
-        setIsLoading(true); // ✅ RESET IMEDIATO: Impede flash de dados antigos
+    // ✅ Memoize date string to prevent unnecessary effect triggers
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+
+    const loadAppointments = useCallback(async (isSilent = false) => {
+        // Se não for silencioso, limpamos o estado anterior e mostramos loading
+        if (!isSilent) {
+            setIsLoading(true);
+            setAppointments([]); // Limpa dados fantasmas do dia anterior
+        }
 
         if (!companyId) {
             setAppointments([]);
@@ -34,81 +41,70 @@ export function useAppointmentsCache(selectedDate: Date, companyId: string | nul
             return;
         }
 
-        const dateStr = format(selectedDate, 'yyyy-MM-dd');
         const cacheKey = `${companyId}-${dateStr}`;
 
-        // ✅ Check cache after reset
-        const cached = cache.get(cacheKey);
-        if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
-            setAppointments(cached.data || []);
-            setIsLoading(false);
-            setError(null);
-            return;
+        // ✅ Check cache (only if not a silent refresh/invalidation)
+        if (!isSilent) {
+            const cached = cache.get(cacheKey);
+            if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
+                setAppointments(cached.data || []);
+                setIsLoading(false);
+                setError(null);
+                return;
+            }
         }
 
-        // ✅ Abort previous request if still pending
+        // Cancel previous request
         abortControllerRef.current?.abort();
-        abortControllerRef.current = new AbortController();
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
 
         try {
-            setIsLoading(true);
             setError(null);
+            // Pass the REAL signal to the service and Supabase
+            const data = await appointmentService.getByDate(dateStr, companyId, controller.signal);
 
-            const data = await appointmentService.getByDate(dateStr, companyId);
-            const appointmentsArray = data || [];
-
-            // ✅ Update cache
-            cache.set(cacheKey, {
-                data: appointmentsArray,
-                timestamp: Date.now()
-            });
-
-            setAppointments(appointmentsArray);
+            // Only update if this request wasn't aborted
+            if (!controller.signal.aborted) {
+                const appointmentsArray = data || [];
+                cache.set(cacheKey, {
+                    data: appointmentsArray,
+                    timestamp: Date.now()
+                });
+                setAppointments(appointmentsArray);
+                setIsLoading(false);
+            }
         } catch (err: any) {
             if (err.name !== 'AbortError') {
                 console.error('Error loading appointments:', err);
                 setError('Não foi possível carregar os agendamentos.');
-                setAppointments([]); // Ensure safe state
+                setIsLoading(false);
             }
-        } finally {
-            setIsLoading(false);
         }
-    }, [selectedDate, companyId]);
+        // DELETED finally: Loading state is handled precisely inside try/catch to avoid race conditions
+    }, [dateStr, companyId]);
 
     useEffect(() => {
         loadAppointments();
-
-        // ✅ Cleanup: abort request on unmount
         return () => {
             abortControllerRef.current?.abort();
         };
     }, [loadAppointments]);
 
-    /**
-     * Invalidate cache and force reload
-     * Call this after create, update, or delete operations
-     */
     const invalidate = useCallback(() => {
         if (companyId) {
-            const dateStr = format(selectedDate, 'yyyy-MM-dd');
-            const cacheKey = `${companyId}-${dateStr}`;
-            cache.delete(cacheKey);
+            cache.delete(`${companyId}-${dateStr}`);
         }
-        loadAppointments();
-    }, [selectedDate, companyId, loadAppointments]);
+        return loadAppointments(true); // Silent refresh
+    }, [dateStr, companyId, loadAppointments]);
 
-    /**
-     * Invalidate entire cache for this company
-     * Use when data changes might affect multiple dates
-     */
     const invalidateAll = useCallback(() => {
         if (companyId) {
-            // Clear all cache entries for this company
             Array.from(cache.keys())
                 .filter(key => key.startsWith(companyId))
                 .forEach(key => cache.delete(key));
         }
-        loadAppointments();
+        return loadAppointments(true);
     }, [companyId, loadAppointments]);
 
     return { appointments: appointments || [], isLoading, error, invalidate, invalidateAll };

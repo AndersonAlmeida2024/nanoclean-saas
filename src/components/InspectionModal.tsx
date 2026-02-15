@@ -13,7 +13,6 @@ import {
 } from 'lucide-react';
 import { SignatureCanvas } from './SignatureCanvas';
 import { inspectionService } from '../services/inspectionService';
-import { appointmentService } from '../services/appointmentService';
 import { cn } from '../utils/cn';
 
 interface InspectionModalProps {
@@ -42,6 +41,8 @@ export function InspectionModal({ appointment, isOpen, onClose, onComplete, read
     // Signature State
     const [signature, setSignature] = useState<string | null>(initialData?.customer_signature || null);
 
+    const [uploadingPhoto, setUploadingPhoto] = useState<boolean>(false);
+
     // Sync state with initialData when it changes
     React.useEffect(() => {
         if (initialData) {
@@ -60,8 +61,6 @@ export function InspectionModal({ appointment, isOpen, onClose, onComplete, read
             prev.includes(issue) ? prev.filter(i => i !== issue) : [...prev, issue]
         );
     };
-
-    const [uploadingPhoto, setUploadingPhoto] = useState<boolean>(false);
 
     const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'before' | 'after') => {
         const file = e.target.files?.[0];
@@ -105,9 +104,6 @@ export function InspectionModal({ appointment, isOpen, onClose, onComplete, read
                 photos_after: photosAfter,
                 customer_signature: signature
             });
-
-            // Atualiza o status do agendamento para concluído
-            await appointmentService.update(appointment.id, { status: 'completed' });
 
             onComplete();
             onClose();

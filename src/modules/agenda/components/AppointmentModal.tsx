@@ -1,3 +1,5 @@
+import { technicianService } from '../../../services/technicianService';
+
 import { useState, useEffect } from 'react';
 import { X, Calendar as CalendarIcon, DollarSign, Briefcase, Loader2, Search, MapPin, CheckCircle2 } from 'lucide-react';
 import { appointmentService } from '../../../services/appointmentService';
@@ -19,9 +21,13 @@ export function AppointmentModal({ isOpen, onClose, onSuccess, selectedDate, app
     const companyId = useCompanyId();
     const [isLoading, setIsLoading] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
+
     const [clients, setClients] = useState<any[]>([]);
     const [clientSearch, setClientSearch] = useState('');
     const [isSearchingClients, setIsSearchingClients] = useState(false);
+
+    const [technicians, setTechnicians] = useState<any[]>([]);
+    const [isSearchingTechnicians, setIsSearchingTechnicians] = useState(false);
 
     const [formData, setFormData] = useState({
         client_id: '',
@@ -31,11 +37,13 @@ export function AppointmentModal({ isOpen, onClose, onSuccess, selectedDate, app
         price: '',
         address: '',
         notes: '',
+        technician_id: ''
     });
 
     useEffect(() => {
         if (isOpen) {
             loadClients();
+            loadTechnicians();
             if (appointment) {
                 setFormData({
                     client_id: appointment.client_id,
@@ -45,6 +53,7 @@ export function AppointmentModal({ isOpen, onClose, onSuccess, selectedDate, app
                     price: appointment.price.toString(),
                     address: appointment.address || '',
                     notes: appointment.notes || '',
+                    technician_id: appointment.technician_id || ''
                 });
                 setClientSearch(appointment.clients?.name || '');
             } else {
@@ -56,6 +65,7 @@ export function AppointmentModal({ isOpen, onClose, onSuccess, selectedDate, app
                     price: '',
                     address: '',
                     notes: '',
+                    technician_id: ''
                 });
                 setClientSearch('');
             }
@@ -72,6 +82,19 @@ export function AppointmentModal({ isOpen, onClose, onSuccess, selectedDate, app
             console.error('Erro ao carregar clientes:', err);
         } finally {
             setIsSearchingClients(false);
+        }
+    };
+
+    const loadTechnicians = async () => {
+        if (!companyId) return;
+        try {
+            setIsSearchingTechnicians(true);
+            const data = await technicianService.getAll(companyId);
+            setTechnicians(data || []);
+        } catch (err) {
+            console.error('Erro ao carregar técnicos:', err);
+        } finally {
+            setIsSearchingTechnicians(false);
         }
     };
 
@@ -265,6 +288,49 @@ export function AppointmentModal({ isOpen, onClose, onSuccess, selectedDate, app
                                         onChange={(e) => setFormData({ ...formData, scheduled_time: e.target.value })}
                                         className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-white focus:outline-none focus:border-cyan-500/50 [color-scheme:dark] font-bold"
                                     />
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="block text-[10px] text-gray-500 uppercase font-black tracking-widest pl-1">Técnico Responsável</label>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {isSearchingTechnicians ? (
+                                        <div className="flex items-center justify-center p-4"><Loader2 className="animate-spin text-cyan-500" size={20} /></div>
+                                    ) : technicians.length > 0 ? (
+                                        technicians.map((tech) => (
+                                            <button
+                                                key={tech.id}
+                                                type="button"
+                                                onClick={() => setFormData({ ...formData, technician_id: tech.id })}
+                                                className={cn(
+                                                    "flex items-center gap-3 p-3 rounded-xl border transition-all text-left",
+                                                    formData.technician_id === tech.id
+                                                        ? "bg-slate-800 border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.1)]"
+                                                        : "bg-white/5 border-white/5 hover:border-white/20"
+                                                )}
+                                            >
+                                                <div
+                                                    className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-slate-900"
+                                                    style={{ backgroundColor: tech.color }}
+                                                >
+                                                    {tech.name.charAt(0)}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className={cn(
+                                                        "text-sm font-bold truncate",
+                                                        formData.technician_id === tech.id ? "text-cyan-400" : "text-gray-400"
+                                                    )}>
+                                                        {tech.name}
+                                                    </p>
+                                                </div>
+                                                {formData.technician_id === tech.id && (
+                                                    <div className="w-2 h-2 rounded-full bg-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.5)]" />
+                                                )}
+                                            </button>
+                                        ))
+                                    ) : (
+                                        <p className="text-gray-500 text-xs col-span-2">Nenhum técnico disponível.</p>
+                                    )}
                                 </div>
                             </div>
 

@@ -29,13 +29,15 @@ export function LoginPage() {
             if (authError) {
                 console.error('Login error:', authError);
                 if (authError.message.includes('Invalid login credentials')) {
-                    setError('E-mail ou senha incorretos.');
+                    setError('E-mail ou senha incorretos. Verifique seus dados.');
                 } else if (authError.message.includes('Email not confirmed')) {
-                    setError('Seu e-mail ainda não foi confirmado. Verifique sua caixa de entrada.');
+                    setError('Sua conta ainda não foi ativada. Verifique o link enviado para o seu e-mail.');
                 } else if (authError.message.includes('Too many requests') || (authError as any).status === 429) {
-                    setError('Muitas tentativas. Aguarde alguns instantes e tente novamente.');
+                    setError('Acesso bloqueado temporariamente por excesso de tentativas. Tente novamente em alguns minutos.');
+                } else if (authError.message.includes('Database error')) {
+                    setError('Houve um problema de conexão com o banco de dados. Tente novamente.');
                 } else {
-                    setError('Erro ao entrar. Verifique seus dados e tente novamente.');
+                    setError('Erro ao entrar: ' + authError.message);
                 }
                 return;
             }
@@ -79,10 +81,13 @@ export function LoginPage() {
                     <form onSubmit={handleLogin} className="space-y-5">
                         {/* Email */}
                         <div>
+                            <label htmlFor="login-email" className="sr-only">E-mail</label>
                             <label className="block text-sm text-gray-400 mb-2">E-mail</label>
                             <div className="relative">
                                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
                                 <input
+                                    id="login-email"
+                                    name="email"
                                     type="email"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
@@ -95,10 +100,13 @@ export function LoginPage() {
 
                         {/* Password */}
                         <div>
+                            <label htmlFor="login-password" title="Senha" className="sr-only">Senha</label>
                             <label className="block text-sm text-gray-400 mb-2">Senha</label>
                             <div className="relative">
                                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
                                 <input
+                                    id="login-password"
+                                    name="password"
                                     type={showPassword ? 'text' : 'password'}
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
@@ -110,7 +118,8 @@ export function LoginPage() {
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 focus:outline-none focus:text-cyan-400"
+                                    aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
                                 >
                                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                                 </button>
@@ -162,7 +171,7 @@ export function LoginPage() {
                 </div>
 
                 {/* Footer */}
-                <p className="text-center text-gray-600 text-sm mt-6">
+                <p className="text-center text-gray-400 text-sm mt-6">
                     © 2026 NanoClean. Todos os direitos reservados.
                 </p>
             </div>

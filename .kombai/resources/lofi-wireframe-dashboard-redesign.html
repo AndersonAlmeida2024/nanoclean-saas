@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Redesign - NanoClean</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Comic Sans MS', 'Chalkboard SE', 'Comic Neue', cursive;
+            background: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border: 3px solid #000;
+            border-radius: 8px;
+            padding: 40px;
+        }
+
+        .header {
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 2px dashed #999;
+        }
+
+        h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+            color: #000;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: 250px 1fr;
+            gap: 30px;
+            min-height: 600px;
+        }
+
+        .sidebar {
+            border: 2px solid #000;
+            border-radius: 6px;
+            padding: 20px;
+            background: #fff;
+        }
+
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .stat-card {
+            border: 2px solid #333;
+            border-radius: 6px;
+            padding: 20px;
+            background: #f9f9f9;
+            position: relative;
+        }
+
+        .content-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 30px;
+        }
+
+        .card {
+            border: 2px solid #333;
+            border-radius: 6px;
+            padding: 20px;
+            background: white;
+        }
+
+        .nav-item {
+            padding: 12px;
+            margin: 8px 0;
+            border: 2px solid #666;
+            border-radius: 4px;
+            background: #f0f0f0;
+            cursor: pointer;
+        }
+
+        .nav-item.active {
+            background: #ccc;
+            border-color: #000;
+        }
+
+        .badge {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: bold;
+            font-family: Arial, sans-serif;
+            z-index: 10;
+        }
+
+        .badge-reuse {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .badge-new {
+            background: #FF9800;
+            color: white;
+        }
+
+        .placeholder {
+            background: #e0e0e0;
+            border: 2px dashed #999;
+            padding: 30px;
+            text-align: center;
+            color: #666;
+            border-radius: 6px;
+        }
+
+        .button {
+            padding: 12px 24px;
+            border: 2px solid #000;
+            border-radius: 6px;
+            background: #ddd;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .button-primary {
+            background: #333;
+            color: white;
+        }
+
+        .icon-box {
+            width: 40px;
+            height: 40px;
+            border: 2px solid #666;
+            border-radius: 4px;
+            display: inline-block;
+            background: #f0f0f0;
+            text-align: center;
+            line-height: 36px;
+        }
+
+        .schedule-item {
+            padding: 15px;
+            border: 2px solid #999;
+            border-radius: 4px;
+            margin: 10px 0;
+            background: #fafafa;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .schedule-item.current {
+            border-color: #000;
+            background: #e8e8e8;
+        }
+
+        .time-badge {
+            padding: 8px 12px;
+            border: 2px solid #666;
+            border-radius: 4px;
+            font-weight: bold;
+            background: white;
+        }
+
+        @media (max-width: 768px) {
+            .layout {
+                grid-template-columns: 1fr;
+            }
+
+            .content-row {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        .quick-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .action-card {
+            flex: 1;
+            min-width: 150px;
+            padding: 20px;
+            border: 2px solid #666;
+            border-radius: 6px;
+            text-align: center;
+            background: #f5f5f5;
+        }
+
+        .trend-indicator {
+            display: inline-block;
+            padding: 4px 8px;
+            border: 1px solid #999;
+            border-radius: 3px;
+            font-size: 11px;
+            background: #eee;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Dashboard Redesign - NanoClean</h1>
+            <p class="subtitle">Wireframe mostrando layout otimizado com melhor hierarquia de informações e componentes reutilizáveis</p>
+        </div>
+
+        <div class="layout">
+            <!-- SIDEBAR -->
+            <aside class="sidebar">
+                <!-- REUSABLE: Sidebar from src/components/Sidebar.tsx -->
+                <span class="badge badge-reuse" title="src/components/Sidebar.tsx">[REUSE] Sidebar</span>
+                
+                <div style="margin-bottom: 20px; padding: 10px; border: 2px solid #999; border-radius: 4px;">
+                    <!-- REUSABLE: CompanySelector from src/components/CompanySelector.tsx -->
+                    <span class="badge badge-reuse" title="src/components/CompanySelector.tsx" style="top: 4px;">[REUSE] CompanySelector</span>
+                    <div style="font-size: 10px; color: #999;">UNIDADE ATUAL</div>
+                    <div style="font-weight: bold;">Matriz SP ▼</div>
+                </div>
+
+                <nav>
+                    <div class="nav-item active">🏠 Dashboard</div>
+                    <div class="nav-item">📅 Agenda</div>
+                    <div class="nav-item">👥 CRM</div>
+                    <div class="nav-item">💰 Financeiro</div>
+                    <div class="nav-item">🏢 Filiais</div>
+                </nav>
+
+                <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #ddd;">
+                    <div class="button" style="width: 100%;">🚪 Sair</div>
+                </div>
+            </aside>
+
+            <!-- MAIN CONTENT -->
+            <main class="main-content">
+                <!-- HEADER SECTION -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <div>
+                        <h2 style="font-size: 24px; margin-bottom: 5px;">Boa tarde, Anderson 👋</h2>
+                        <p class="subtitle"><strong style="color: #333;">NanoClean Higienização</strong> • quarta-feira, 12 de fevereiro</p>
+                    </div>
+                    <!-- NEW COMPONENT: NotificationBell -->
+                    <div style="position: relative;">
+                        <span class="badge badge-new" title="To be created at src/components/NotificationBell.tsx">[NEW] NotificationBell</span>
+                        <div class="icon-box">🔔</div>
+                        <div style="position: absolute; top: -5px; right: -5px; width: 18px; height: 18px; background: #f00; border-radius: 50%; border: 2px solid white; color: white; font-size: 10px; text-align: center; line-height: 14px;">3</div>
+                    </div>
+                </div>
+
+                <!-- STATS GRID -->
+                <div class="stats-grid">
+                    <!-- REUSABLE: Stat cards using existing pattern from DashboardPage.tsx -->
+                    <div class="stat-card">
+                        <span class="badge badge-reuse" title="Pattern from src/pages/DashboardPage.tsx">[REUSE] StatCard Pattern</span>
+                        <div class="icon-box">📈</div>
+                        <div style="margin-top: 10px;">
+                            <div style="font-size: 12px; color: #666;">Receita do Mês</div>
+                            <div style="font-size: 24px; font-weight: bold; margin: 5px 0;">R$ 45.230</div>
+                            <div class="trend-indicator">↗ +12.5%</div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <span class="badge badge-reuse" title="Pattern from src/pages/DashboardPage.tsx">[REUSE] StatCard Pattern</span>
+                        <div class="icon-box">👥</div>
+                        <div style="margin-top: 10px;">
+                            <div style="font-size: 12px; color: #666;">Clientes Ativos</div>
+                            <div style="font-size: 24px; font-weight: bold; margin: 5px 0;">128</div>
+                            <div class="trend-indicator">↗ +8</div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <span class="badge badge-reuse" title="Pattern from src/pages/DashboardPage.tsx">[REUSE] StatCard Pattern</span>
+                        <div class="icon-box">📅</div>
+                        <div style="margin-top: 10px;">
+                            <div style="font-size: 12px; color: #666;">Serviços Hoje</div>
+                            <div style="font-size: 24px; font-weight: bold; margin: 5px 0;">7</div>
+                            <div class="trend-indicator">3 pendentes</div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <span class="badge badge-reuse" title="Pattern from src/pages/DashboardPage.tsx">[REUSE] StatCard Pattern</span>
+                        <div class="icon-box">💬</div>
+                        <div style="margin-top: 10px;">
+                            <div style="font-size: 12px; color: #666;">Leads Novos</div>
+                            <div style="font-size: 24px; font-weight: bold; margin: 5px 0;">12</div>
+                            <div class="trend-indicator">Aguardando</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- QUICK ACTIONS - NEW SECTION -->
+                <div class="card" style="position: relative;">
+                    <span class="badge badge-new" title="New section for quick actions">[NEW] QuickActions Section</span>
+                    <h3 style="margin-bottom: 15px;">⚡ Ações Rápidas</h3>
+                    <div class="quick-actions">
+                        <div class="action-card">
+                            <div class="icon-box" style="margin: 0 auto 10px;">➕</div>
+                            <div style="font-size: 12px; font-weight: bold;">Novo Cliente</div>
+                        </div>
+                        <div class="action-card">
+                            <div class="icon-box" style="margin: 0 auto 10px;">📅</div>
+                            <div style="font-size: 12px; font-weight: bold;">Agendar Serviço</div>
+                        </div>
+                        <div class="action-card">
+                            <div class="icon-box" style="margin: 0 auto 10px;">💵</div>
+                            <div style="font-size: 12px; font-weight: bold;">Registrar Despesa</div>
+                        </div>
+                        <div class="action-card">
+                            <div class="icon-box" style="margin: 0 auto 10px;">📊</div>
+                            <div style="font-size: 12px; font-weight: bold;">Ver Relatório</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MAIN CONTENT ROW -->
+                <div class="content-row">
+                    <!-- TODAY'S SCHEDULE -->
+                    <div class="card">
+                        <!-- REUSABLE: Schedule section using AppointmentCard -->
+                        <span class="badge badge-reuse" title="Uses src/components/AppointmentCard.tsx">[REUSE] AppointmentCard</span>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                            <h3>🕐 Agenda de Hoje</h3>
+                            <a href="#" style="color: #666; text-decoration: underline; font-size: 12px;">Ver tudo →</a>
+                        </div>
+
+                        <div class="schedule-item current">
+                            <div class="time-badge">09:00</div>
+                            <div style="flex: 1;">
+                                <div style="font-weight: bold;">João Silva</div>
+                                <div style="font-size: 12px; color: #666;">Limpeza Residencial</div>
+                            </div>
+                            <div style="font-size: 20px;">⏰</div>
+                        </div>
+
+                        <div class="schedule-item">
+                            <div class="time-badge">11:30</div>
+                            <div style="flex: 1;">
+                                <div style="font-weight: bold;">Maria Santos</div>
+                                <div style="font-size: 12px; color: #666;">Limpeza Pós-Obra</div>
+                            </div>
+                            <div style="font-size: 20px;">⏱️</div>
+                        </div>
+
+                        <div class="schedule-item">
+                            <div class="time-badge">14:00</div>
+                            <div style="flex: 1;">
+                                <div style="font-weight: bold;">Empresa ABC</div>
+                                <div style="font-size: 12px; color: #666;">Limpeza Comercial</div>
+                            </div>
+                            <div style="font-size: 20px;">⏱️</div>
+                        </div>
+
+                        <div class="schedule-item">
+                            <div class="time-badge">16:30</div>
+                            <div style="flex: 1;">
+                                <div style="font-weight: bold;">Pedro Costa</div>
+                                <div style="font-size: 12px; color: #666;">Inspeção Técnica</div>
+                            </div>
+                            <div style="font-size: 20px;">⏱️</div>
+                        </div>
+                    </div>
+
+                    <!-- ACTIVITY FEED - ENHANCED -->
+                    <div class="card" style="position: relative;">
+                        <!-- NEW COMPONENT: ActivityFeed -->
+                        <span class="badge badge-new" title="To be created at src/components/ActivityFeed.tsx">[NEW] ActivityFeed</span>
+                        <h3 style="margin-bottom: 20px;">📊 Atividade Recente</h3>
+
+                        <div style="margin-bottom: 15px; padding: 12px; border-left: 3px solid #000; background: #fafafa;">
+                            <div style="font-size: 11px; color: #999;">Há 5 min</div>
+                            <div style="font-weight: bold;">Novo cliente cadastrado</div>
+                            <div style="font-size: 12px; color: #666;">Ana Paula - Lead</div>
+                        </div>
+
+                        <div style="margin-bottom: 15px; padding: 12px; border-left: 3px solid #666; background: #fafafa;">
+                            <div style="font-size: 11px; color: #999;">Há 23 min</div>
+                            <div style="font-weight: bold;">Serviço concluído</div>
+                            <div style="font-size: 12px; color: #666;">João Silva - R$ 450</div>
+                        </div>
+
+                        <div style="margin-bottom: 15px; padding: 12px; border-left: 3px solid #666; background: #fafafa;">
+                            <div style="font-size: 11px; color: #999;">Há 1h</div>
+                            <div style="font-weight: bold;">Pagamento recebido</div>
+                            <div style="font-size: 12px; color: #666;">Maria Santos - R$ 780</div>
+                        </div>
+
+                        <div style="margin-bottom: 15px; padding: 12px; border-left: 3px solid #666; background: #fafafa;">
+                            <div style="font-size: 11px; color: #999;">Há 2h</div>
+                            <div style="font-weight: bold;">Nova avaliação</div>
+                            <div style="font-size: 12px; color: #666;">★★★★★ Carlos Lima</div>
+                        </div>
+
+                        <a href="#" style="display: block; text-align: center; color: #666; text-decoration: underline; font-size: 12px; margin-top: 15px;">Ver todas →</a>
+                    </div>
+                </div>
+
+                <!-- REVENUE CHART - NEW SECTION -->
+                <div class="card" style="position: relative;">
+                    <span class="badge badge-new" title="Using Recharts library already installed">[NEW] RevenueChart</span>
+                    <h3 style="margin-bottom: 20px;">📈 Receita nos Últimos 7 Dias</h3>
+                    <div class="placeholder" style="height: 200px;">
+                        [GRÁFICO DE LINHAS - Recharts]<br>
+                        Evolução diária da receita com comparação semana anterior
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+</body>
+</html>

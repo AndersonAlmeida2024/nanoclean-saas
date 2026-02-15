@@ -1,79 +1,40 @@
 /**
- * Utilitários para geração de links de calendário (Google e ICS)
+ * Calendar Utility - Generate Google Calendar links with guest invites
  */
 
-export interface CalendarEvent {
+interface CalendarEventParams {
     title: string;
     description: string;
     location: string;
-    startTime: string; // ISO String
-    endTime: string;   // ISO String
+    startTime: string; // ISO String or YYYYMMDDTHHmmSSZ
+    endTime: string;
+    guestEmail?: string;
 }
 
-export const calendarUtils = {
-    /**
-     * Gera link para Google Calendar
-     */
-    generateGoogleUrl(event: CalendarEvent): string {
-        const fmt = (date: string) => date.replace(/[-:]/g, '').split('.')[0] + 'Z';
-        const start = fmt(event.startTime);
-        const end = fmt(event.endTime);
+/**
+ * Generates a Google Calendar link
+ * @param params Event details
+ * @returns Link to create event in Google Calendar
+ */
+export function generateGoogleCalendarLink(params: CalendarEventParams): string {
+    const { title, description, location, startTime, endTime, guestEmail } = params;
 
-        const params = new URLSearchParams({
-            action: 'TEMPLATE',
-            text: event.title,
-            dates: `${start}/${end}`,
-            details: event.description,
-            location: event.location,
-        });
+    // Format dates for Google: YYYYMMDDTHHmmSS (omit Z to keep local context if needed)
+    // or keep Z if it comes from toISOString()
+    const fmtStart = startTime.replace(/[-:]/g, '').split('.')[0] + (startTime.endsWith('Z') ? 'Z' : '');
+    const fmtEnd = endTime.replace(/[-:]/g, '').split('.')[0] + (endTime.endsWith('Z') ? 'Z' : '');
 
-        return `https://www.google.com/calendar/render?${params.toString()}`;
-    },
+    const baseUrl = 'https://calendar.google.com/calendar/render?action=TEMPLATE';
+    const url = new URL(baseUrl);
 
-    /**
-     * Gera conteúdo de arquivo ICS (Apple/Outlook)
-     */
-    generateIcsContent(event: CalendarEvent): string {
-        const fmt = (date: string) => date.replace(/[-:]/g, '').split('.')[0] + 'Z';
+    url.searchParams.append('text', title);
+    url.searchParams.append('dates', `${fmtStart}/${fmtEnd}`);
+    url.searchParams.append('details', description);
+    url.searchParams.append('location', location);
 
-        return [
-            'BEGIN:VCALENDAR',
-            'VERSION:2.0',
-            'PRODID:-//NanoClean//SaaS//BR',
-            'BEGIN:VEVENT',
-            `DTSTART:${fmt(event.startTime)}`,
-            `DTEND:${fmt(event.endTime)}`,
-            `SUMMARY:${event.title}`,
-            `DESCRIPTION:${event.description.replace(/\n/g, '\\n')}`,
-            `LOCATION:${event.location}`,
-            'BEGIN:VALARM',
-            'TRIGGER:-P1D',
-            'ACTION:DISPLAY',
-            'DESCRIPTION:Lembrete de Serviço NanoClean',
-            'END:VALARM',
-            'END:VEVENT',
-            'END:VCALENDAR'
-        ].join('\r\n');
-    },
-
-    /**
-     * Faz o download do arquivo ICS no navegador
-     */
-    downloadIcs(event: CalendarEvent) {
-        const content = this.generateIcsContent(event);
-        const blob = new Blob([content], { type: 'text/calendar;charset=utf-8' });
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', 'agendamento-nanoclean.ics');
-        document.body.appendChild(link);
-        link.click();
-        try {
-            if (document.body.contains(link)) document.body.removeChild(link);
-        } catch (e) {
-            console.warn('Failed to remove calendar download link', e);
-        } finally {
-            window.URL.revokeObjectURL(url);
-        }
+    if (guestEmail) {
+        url.searchParams.append('add', guestEmail);
     }
-};
+
+    return url.toString();
+}

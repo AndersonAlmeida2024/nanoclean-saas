@@ -53,6 +53,13 @@ export const TRANSACTION_CATEGORIES: CategoryMetadata[] = [
         bgColor: 'bg-purple-500/10'
     },
     {
+        id: 'Comissão',
+        label: 'Comissão',
+        icon: ArrowUpRight,
+        color: 'text-yellow-400',
+        bgColor: 'bg-yellow-500/10'
+    },
+    {
         id: 'outros',
         label: 'Outros',
         icon: Tag,

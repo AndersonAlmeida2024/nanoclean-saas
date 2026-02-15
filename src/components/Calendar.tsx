@@ -19,9 +19,10 @@ interface CalendarProps {
     selectedDate: Date;
     onDateSelect: (date: Date) => void;
     appointmentsDates?: string[]; // Array de strings 'YYYY-MM-DD'
+    techniciansColors?: Record<string, string[]>; // 'YYYY-MM-DD': ['#color1', '#color2']
 }
 
-export function Calendar({ selectedDate, onDateSelect, appointmentsDates = [] }: CalendarProps) {
+export function Calendar({ selectedDate, onDateSelect, appointmentsDates = [], techniciansColors = {} }: CalendarProps) {
     const [currentMonth, setCurrentMonth] = useState(new Date());
 
     const nextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
@@ -105,17 +106,25 @@ export function Calendar({ selectedDate, onDateSelect, appointmentsDates = [] }:
                     )}
                 >
                     <span className={cn(
-                        "text-sm z-10",
-                        isToday && !isSelected && "bg-white/10 w-8 h-8 flex items-center justify-center rounded-full"
+                        "text-xs md:text-sm z-10",
+                        isToday && !isSelected && "bg-white/10 w-6 h-6 md:w-8 md:h-8 flex items-center justify-center rounded-full"
                     )}>
                         {format(day, 'd')}
                     </span>
 
                     {hasAppointments && (
-                        <div className={cn(
-                            "absolute bottom-2 w-1 h-1 rounded-full",
-                            isSelected ? "bg-cyan-400" : "bg-cyan-500/60"
-                        )} />
+                        <div className="absolute bottom-1.5 flex gap-0.5 justify-center w-full px-1 flex-wrap max-w-[2rem]">
+                            {(techniciansColors?.[formattedDate] || ['#06b6d4']).slice(0, 4).map((color, idx) => (
+                                <div
+                                    key={idx}
+                                    className="w-1.5 h-1.5 rounded-full shadow-sm ring-1 ring-black/20"
+                                    style={{ backgroundColor: color }}
+                                />
+                            ))}
+                            {(techniciansColors?.[formattedDate]?.length || 0) > 4 && (
+                                <div className="w-1.5 h-1.5 rounded-full bg-gray-500" />
+                            )}
+                        </div>
                     )}
 
                     {/* Glow effect on hover */}
@@ -137,7 +146,7 @@ export function Calendar({ selectedDate, onDateSelect, appointmentsDates = [] }:
     };
 
     return (
-        <div className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-sm">
+        <div className="bg-white/5 border border-white/10 rounded-3xl p-4 md:p-6 backdrop-blur-sm">
             {renderHeader()}
             {renderDays()}
             {renderCells()}

@@ -5,6 +5,12 @@ export type Appointment = Database['public']['Tables']['appointments']['Row'] & 
     clients?: {
         name: string;
         phone: string;
+        address?: string;
+    } | null;
+    technicians?: {
+        name: string;
+        color: string;
+        phone: string;
     } | null;
     service_inspections?: {
         id: string;
@@ -18,6 +24,13 @@ const APPOINTMENT_SELECT = `
     *,
     clients (
         name,
+        phone,
+        email,
+        address
+    ),
+    technicians (
+        name,
+        color,
         phone
     ),
     service_inspections (
@@ -157,5 +170,23 @@ export const appointmentService = {
         } catch (err) {
             console.error('[handleFinancialSync] Erro ao sincronizar financeiro:', err);
         }
+    },
+
+    async getByClient(clientId: string) {
+        const { data, error } = await supabase
+            .from('appointments')
+            .select(`
+                *,
+                service_inspections (*)
+            `)
+            .eq('client_id', clientId)
+            .order('scheduled_date', { ascending: false });
+
+        if (error) {
+            console.error('[appointmentService.getByClient] Error:', error);
+            throw error;
+        }
+
+        return data;
     }
 };

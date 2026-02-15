@@ -13,6 +13,7 @@ import { motion } from 'framer-motion';
 import { useAuthStore } from '../stores/authStore';
 import { companyService } from '../services/companyService';
 import type { Company } from '../services/companyService';
+import { withTimeout } from '../utils/withTimeout';
 
 export function BranchesPage() {
     const { activeCompanyId, memberships, switchCompany } = useAuthStore();
@@ -20,6 +21,7 @@ export function BranchesPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [isCreating, setIsCreating] = useState(false);
     const [newBranch, setNewBranch] = useState({ name: '', slug: '' });
+    const [error, setError] = useState<string | null>(null);
 
     // Verifica se a empresa ativa é Matriz
     const activeMembership = memberships.find(m => m.company_id === activeCompanyId);
@@ -29,6 +31,9 @@ export function BranchesPage() {
     useEffect(() => {
         if (isMatrix && activeCompanyId) {
             loadBranches();
+        } else if (activeCompanyId) {
+            // Not matrix, stop loading immediately
+            setIsLoading(false);
         }
     }, [activeCompanyId, isMatrix]);
 
@@ -36,10 +41,16 @@ export function BranchesPage() {
         if (!activeCompanyId) return;
         try {
             setIsLoading(true);
-            const data = await companyService.getBranches(activeCompanyId);
+            setError(null);
+            const data = await withTimeout(
+                companyService.getBranches(activeCompanyId),
+                10000,
+                'Timeout ao carregar filiais. Verifique sua conexão.'
+            );
             setBranches(data);
         } catch (err) {
             console.error('Erro ao carregar filiais:', err);
+            setError(err instanceof Error ? err.message : 'Erro ao carregar filiais');
         } finally {
             setIsLoading(false);
         }
@@ -105,6 +116,22 @@ export function BranchesPage() {
                     Nova Filial
                 </button>
             </div>
+
+            {/* Error State */}
+            {error && (
+                <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-start justify-between">
+                    <div className="flex-1">
+                        <p className="text-red-400 font-medium mb-2">Erro ao carregar dados</p>
+                        <p className="text-red-300/70 text-sm">{error}</p>
+                    </div>
+                    <button
+                        onClick={() => loadBranches()}
+                        className="ml-4 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-lg text-sm font-bold transition-all"
+                    >
+                        Tentar Novamente
+                    </button>
+                </div>
+            )}
 
             {/* Stats */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

@@ -54,5 +54,20 @@ export const clientService = {
             .eq('id', id);
 
         if (error) throw error;
+    },
+
+    async updateStage(id: string, stage: string) {
+        const { data, error } = await supabase
+            .from('clients')
+            .update({ stage })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Error updating client stage:', error);
+            throw error;
+        }
+        return data;
     }
 };

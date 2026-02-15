@@ -10,6 +10,8 @@ export interface Transaction {
     category: TransactionCategory;
     appointment_id?: string;
     user_id: string;
+    technician_id?: string;
+    status?: 'pending' | 'paid' | 'cancelled';
 }
 
 export type TransactionType = 'income' | 'expense';
@@ -25,6 +27,7 @@ export type TransactionCategory =
     | 'produtos'
     | 'marketing'
     | 'contabilidade'
+    | 'Comissão'
     | 'outros';
 
 /**

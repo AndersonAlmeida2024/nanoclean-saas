@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import { adminService, type AdminCompany } from '../services/adminService';
 import { Building2, ShieldAlert, CheckCircle2, MoreVertical, Plus, Search, Filter } from 'lucide-react';
 import { cn } from '../utils/cn';
+import { withTimeout } from '../utils/withTimeout';
 
 export function AdminCompaniesPage() {
     const [companies, setCompanies] = useState<AdminCompany[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         loadCompanies();
@@ -15,10 +17,16 @@ export function AdminCompaniesPage() {
     async function loadCompanies() {
         try {
             setIsLoading(true);
-            const data = await adminService.listCompanies();
+            setError(null);
+            const data = await withTimeout(
+                adminService.listCompanies(),
+                15000,
+                'Timeout ao carregar empresas. Verifique sua conexão.'
+            );
             setCompanies(data);
         } catch (err) {
-            console.error('Failed to load companies');
+            console.error('Failed to load companies:', err);
+            setError(err instanceof Error ? err.message : 'Erro ao carregar empresas');
         } finally {
             setIsLoading(false);
         }
@@ -84,6 +92,22 @@ export function AdminCompaniesPage() {
                     Filtros
                 </button>
             </div>
+
+            {/* Error State */}
+            {error && (
+                <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-start justify-between">
+                    <div className="flex-1">
+                        <p className="text-red-400 font-medium mb-2">Erro ao carregar empresas</p>
+                        <p className="text-red-300/70 text-sm">{error}</p>
+                    </div>
+                    <button
+                        onClick={() => loadCompanies()}
+                        className="ml-4 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-lg text-sm font-bold transition-all"
+                    >
+                        Tentar Novamente
+                    </button>
+                </div>
+            )}
 
             {/* Companies List */}
             <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden backdrop-blur-md">

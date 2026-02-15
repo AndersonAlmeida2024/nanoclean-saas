@@ -1,7 +1,8 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { FinanceStats } from '../modules/finance/components/FinanceStats';
 import { FinanceChart } from '../modules/finance/components/FinanceChart';
 import { ExpenseModal } from '../modules/finance/components/ExpenseModal';
+import { CommissionsTab } from '../modules/finance/components/CommissionsTab';
 import { Download, Plus, Filter, FileText, ChevronDown, Calendar, X, Calculator, Loader2, AlertCircle } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -12,9 +13,11 @@ import { ptBR } from 'date-fns/locale';
 import type { Transaction, FinanceStatsData } from '../modules/finance/types/finance.types';
 import { getCategoryMetadata } from '../modules/finance/constants';
 import { useAuthStore } from '../stores/authStore';
-import { useCallback } from 'react';
+import { useToast } from '../components/Toast';
+import { withTimeout } from '../utils/withTimeout';
 
 export function FinancePage() {
+    const toast = useToast();
     const { companyId } = useAuthStore();
     const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -29,17 +32,22 @@ export function FinancePage() {
     });
     const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
     const [activePreset, setActivePreset] = useState<string>('Este Mês');
+    const [activeTab, setActiveTab] = useState<'movimentacoes' | 'comissoes'>('movimentacoes');
 
     const loadData = useCallback(async () => {
         if (!companyId) return;
         try {
             setIsLoading(true);
             setError(null);
-            const data = await transactionService.getAll(companyId);
+            const data = await withTimeout(
+                transactionService.getAll(companyId),
+                10000,
+                'Timeout ao carregar transações'
+            );
             setTransactions((data as unknown as Transaction[]) || []);
         } catch (err) {
             console.error('Erro ao carregar finanças:', err);
-            setError('Não foi possível carregar os dados financeiros. Verifique sua conexão.');
+            setError(err instanceof Error ? err.message : 'Não foi possível carregar os dados financeiros. Verifique sua conexão.');
         } finally {
             setIsLoading(false);
         }
@@ -96,8 +104,7 @@ export function FinancePage() {
     const handleExportPDF = () => {
         try {
             if (filteredTransactions.length === 0) {
-                // Inline feedback could be better here, but alert is acceptable for export actions specifically
-                alert('Nenhuma movimentação para exportar neste período.');
+                toast.error('Nenhuma movimentação para exportar neste período.');
                 return;
             }
 
@@ -149,7 +156,7 @@ export function FinancePage() {
     const handleExportReport = () => {
         try {
             if (filteredTransactions.length === 0) {
-                alert('Nenhuma movimentação para exportar neste período.');
+                toast.error('Nenhuma movimentação para exportar neste período.');
                 return;
             }
 
@@ -280,7 +287,7 @@ export function FinancePage() {
                                         const content = [headers.join('\t'), ...rows.map(r => r.join('\t'))].join('\n');
                                         navigator.clipboard.writeText(content);
                                         // Could use a toast here instead of alert
-                                        alert('Dados copiados! Você pode colar direto no Excel ou Bloco de Notas.');
+                                        toast.success('Dados copiados! Você pode colar direto no Excel.');
                                         setIsExportDropdownOpen(false);
                                     }}
                                     className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 text-sm text-gray-300 transition-colors"
@@ -384,80 +391,113 @@ export function FinancePage() {
                 )}
             </div>
 
-            <FinanceStats stats={stats} />
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 space-y-6">
-                    <FinanceChart
-                        period={activePreset === 'Customizado'
-                            ? `${format(dateRange.start, 'dd/MM')} - ${format(dateRange.end, 'dd/MM')}`
-                            : activePreset}
-                        transactions={filteredTransactions}
-                    />
-
-                    {/* Insights Card */}
-                    <div className="bg-gradient-to-br from-cyan-500/10 to-purple-500/10 border border-white/10 rounded-2xl p-6 shadow-2xl">
-                        <h3 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
-                            Consultoria Financeira Elite
-                        </h3>
-                        <p className="text-gray-400 text-sm leading-relaxed">
-                            Seu faturamento está <span className="text-green-400 font-bold">saudável</span>.
-                            Dica do Time: Analisando seus custos, você pode economizar comprando em volume trimestral categorias como <span className="text-white">Produtos de Limpeza</span>.
-                        </p>
-                    </div>
-                </div>
-
-                {/* Right Column: Transactions */}
-                <div className="bg-[#111] border border-white/10 rounded-2xl p-6 shadow-2xl relative overflow-hidden">
-                    <div className="flex items-center justify-between mb-6">
-                        <h3 className="text-lg font-black text-white px-2">Fluxo de Caixa</h3>
-                        <Filter size={18} className="text-gray-500" />
-                    </div>
-
-                    <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-                        {isLoading ? (
-                            <div className="flex justify-center py-12">
-                                <Loader2 className="animate-spin text-cyan-500" size={32} />
-                            </div>
-                        ) : filteredTransactions.length === 0 ? (
-                            <div className="text-center py-12 text-gray-600">
-                                <p className="text-sm">Nenhuma movimentação neste período.</p>
-                            </div>
-                        ) : (
-                            filteredTransactions.map((t) => {
-                                const metadata = getCategoryMetadata(t.category);
-                                const Icon = metadata.icon;
-
-                                return (
-                                    <div key={t.id} className="flex items-center justify-between p-3 bg-white/[0.02] border border-white/5 rounded-xl hover:bg-white/5 transition-all group">
-                                        <div className="flex items-center gap-3">
-                                            <div className={cn(
-                                                "p-2.5 rounded-lg border transition-colors",
-                                                metadata.bgColor,
-                                                "border-transparent group-hover:border-white/10"
-                                            )}>
-                                                <Icon size={18} className={metadata.color} />
-                                            </div>
-                                            <div>
-                                                <p className="text-sm font-bold text-white group-hover:text-cyan-400 transition-colors uppercase tracking-tight line-clamp-1">{t.description}</p>
-                                                <p className="text-[10px] text-gray-500 font-medium">
-                                                    {t.created_at ? format(new Date(t.created_at), "dd 'de' MMM, HH:mm", { locale: ptBR }) : 'Data indefinida'} • <span className="capitalize">{metadata.label}</span>
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <span className={cn(
-                                            "text-sm font-black whitespace-nowrap",
-                                            t.type === 'income' ? "text-green-400" : "text-red-400"
-                                        )}>
-                                            {t.type === 'income' ? '+' : '-'} R$ {Number(t.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                        </span>
-                                    </div>
-                                );
-                            })
-                        )}
-                    </div>
-                </div>
+            {/* Tabs Navigation */}
+            <div className="flex gap-2 bg-white/5 border border-white/10 rounded-2xl p-1 mb-6">
+                <button
+                    onClick={() => setActiveTab('movimentacoes')}
+                    className={cn(
+                        "flex-1 py-3 px-6 rounded-xl font-bold text-sm transition-all",
+                        activeTab === 'movimentacoes'
+                            ? "bg-white text-black shadow-lg"
+                            : "text-gray-400 hover:text-white hover:bg-white/5"
+                    )}
+                >
+                    Movimentações
+                </button>
+                <button
+                    onClick={() => setActiveTab('comissoes')}
+                    className={cn(
+                        "flex-1 py-3 px-6 rounded-xl font-bold text-sm transition-all",
+                        activeTab === 'comissoes'
+                            ? "bg-white text-black shadow-lg"
+                            : "text-gray-400 hover:text-white hover:bg-white/5"
+                    )}
+                >
+                    Comissões
+                </button>
             </div>
+
+            {activeTab === 'comissoes' ? (
+                <CommissionsTab />
+            ) : (
+                <>
+                    <FinanceStats stats={stats} />
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div className="lg:col-span-2 space-y-6">
+                            <FinanceChart
+                                period={activePreset === 'Customizado'
+                                    ? `${format(dateRange.start, 'dd/MM')} - ${format(dateRange.end, 'dd/MM')}`
+                                    : activePreset}
+                                transactions={filteredTransactions}
+                            />
+
+                            {/* Insights Card */}
+                            <div className="bg-gradient-to-br from-cyan-500/10 to-purple-500/10 border border-white/10 rounded-2xl p-6 shadow-2xl">
+                                <h3 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
+                                    Consultoria Financeira Elite
+                                </h3>
+                                <p className="text-gray-400 text-sm leading-relaxed">
+                                    Seu faturamento está <span className="text-green-400 font-bold">saudável</span>.
+                                    Dica do Time: Analisando seus custos, você pode economizar comprando em volume trimestral categorias como <span className="text-white">Produtos de Limpeza</span>.
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Right Column: Transactions */}
+                        <div className="bg-[#111] border border-white/10 rounded-2xl p-6 shadow-2xl relative overflow-hidden">
+                            <div className="flex items-center justify-between mb-6">
+                                <h3 className="text-lg font-black text-white px-2">Fluxo de Caixa</h3>
+                                <Filter size={18} className="text-gray-500" />
+                            </div>
+
+                            <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+                                {isLoading ? (
+                                    <div className="flex justify-center py-12">
+                                        <Loader2 className="animate-spin text-cyan-500" size={32} />
+                                    </div>
+                                ) : filteredTransactions.length === 0 ? (
+                                    <div className="text-center py-12 text-gray-600">
+                                        <p className="text-sm">Nenhuma movimentação neste período.</p>
+                                    </div>
+                                ) : (
+                                    filteredTransactions.map((t) => {
+                                        const metadata = getCategoryMetadata(t.category);
+                                        const Icon = metadata.icon;
+
+                                        return (
+                                            <div key={t.id} className="flex items-center justify-between p-3 bg-white/[0.02] border border-white/5 rounded-xl hover:bg-white/5 transition-all group">
+                                                <div className="flex items-center gap-3">
+                                                    <div className={cn(
+                                                        "p-2.5 rounded-lg border transition-colors",
+                                                        metadata.bgColor,
+                                                        "border-transparent group-hover:border-white/10"
+                                                    )}>
+                                                        <Icon size={18} className={metadata.color} />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-sm font-bold text-white group-hover:text-cyan-400 transition-colors uppercase tracking-tight line-clamp-1">{t.description}</p>
+                                                        <p className="text-[10px] text-gray-500 font-medium">
+                                                            {t.created_at ? format(new Date(t.created_at), "dd 'de' MMM, HH:mm", { locale: ptBR }) : 'Data indefinida'} • <span className="capitalize">{metadata.label}</span>
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <span className={cn(
+                                                    "text-sm font-black whitespace-nowrap",
+                                                    t.type === 'income' ? "text-green-400" : "text-red-400"
+                                                )}>
+                                                    {t.type === 'income' ? '+' : '-'} R$ {Number(t.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                                </span>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                </>
+            )}
 
             <ExpenseModal
                 isOpen={isExpenseModalOpen}
