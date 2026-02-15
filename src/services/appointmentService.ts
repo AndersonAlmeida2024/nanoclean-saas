@@ -73,6 +73,25 @@ export const appointmentService = {
         return (data as any) || [];
     },
 
+    async getUpcoming(companyId: string): Promise<Appointment[]> {
+        if (!companyId) throw new Error('companyId is required');
+        const today = new Date().toISOString().split('T')[0];
+
+        const { data, error } = await supabase
+            .from('appointments')
+            .select(APPOINTMENT_SELECT)
+            .eq('company_id', companyId)
+            .gte('scheduled_date', today)
+            .order('scheduled_date', { ascending: true })
+            .order('scheduled_time', { ascending: true });
+
+        if (error) {
+            console.error('[appointmentService.getUpcoming] Error:', error);
+            throw error;
+        }
+        return (data as any) || [];
+    },
+
     async create(appointment: AppointmentInsert) {
         // Log preventivo para debugar company_id ausente no front
         console.log('[appointmentService.create] Payload:', appointment);

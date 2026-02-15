@@ -47,11 +47,15 @@ export function TechnicianPortalPage() {
 
     // TanStack Query para carregar dados (com cache offline via persister)
     const { data: appointments = [], isLoading, isError } = useQuery({
-        queryKey: ['technician-appointments', activeCompanyId, user?.id, today],
+        queryKey: ['technician-appointments', activeCompanyId, user?.id, activeTab, today],
         queryFn: async () => {
             if (!activeCompanyId || !user) return [];
             // O backend via RLS já filtra o que o técnico pode ver
-            return await appointmentService.getByDate(today, activeCompanyId);
+            if (activeTab === 'today') {
+                return await appointmentService.getByDate(today, activeCompanyId);
+            } else {
+                return await appointmentService.getUpcoming(activeCompanyId);
+            }
         },
         enabled: !!activeCompanyId && !!user,
         staleTime: 1000 * 60 * 5, // 5 minutos
@@ -82,9 +86,7 @@ export function TechnicianPortalPage() {
         );
     }
 
-    const filteredAppointments = activeTab === 'today'
-        ? appointments
-        : appointments.filter(a => a.status === 'scheduled'); // Mock simples para aba de próximos
+    const filteredAppointments = appointments;
 
     return (
         <div className="min-h-screen bg-[#0a0a0a] text-white pb-32">
