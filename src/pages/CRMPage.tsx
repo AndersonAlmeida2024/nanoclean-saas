@@ -89,7 +89,7 @@ export function CRMPage({ forcedView }: CRMPageProps) {
 
     // ✅ SAFETY GUARD: Prevent rendering if clients data is missing and not loading.
     if (!clients && !isLoading) return null;
->>>>>>> 004fe50229f5868424fc294ebbdf607ec730a724
+
 
     return (
         <div className="space-y-8 pb-10">
