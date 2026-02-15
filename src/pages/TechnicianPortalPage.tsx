@@ -213,13 +213,13 @@ export function TechnicianPortalPage() {
 
                                 <div className="flex items-center gap-1.5 text-xs text-slate-400 mb-6 bg-white/5 p-2 rounded-lg truncate">
                                     <MapPin size={12} className="text-red-500 shrink-0" />
-                                    <span className="truncate">{apt.location || 'Consultar endereço na ficha'}</span>
+                                    <span className="truncate">{apt.clients?.address || 'Consultar endereço na ficha'}</span>
                                 </div>
 
                                 {/* Botões Operacionais GIGANTES (Thumb-Friendly) */}
                                 <div className="grid grid-cols-2 gap-3 mb-3">
                                     <button
-                                        onClick={() => handleWaze(apt.location || '')}
+                                        onClick={() => handleWaze(apt.clients?.address || '')}
                                         className="h-14 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl border border-white/10 flex items-center justify-center gap-2 font-bold transition-all active:scale-95"
                                     >
                                         <Navigation size={20} className="text-blue-400" />
