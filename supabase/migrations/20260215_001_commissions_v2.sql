@@ -77,7 +77,3 @@ BEGIN
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- 5. Data Migration (Backfill) - Opcional, mas recomendado
--- Tenta vincular transações de comissão antigas aos técnicos baseando-se no texto 'Comissão' e data recente
--- (Complexo fazer automaticamente sem technician_id no appointment histórico, melhor deixar zerado ou fazer manual se crítico)
