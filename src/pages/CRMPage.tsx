@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+```javascript
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Search, Plus, Loader2, AlertCircle, Users, LayoutGrid, List } from 'lucide-react';
 import { clientService } from '../services/clientService';
 import { useCompanyId, usePlatformLoaded } from '../stores/authStore';
@@ -7,6 +8,7 @@ import { ClientCard } from '../modules/crm/components/ClientCard';
 import { KanbanBoard } from '../modules/crm/components/KanbanBoard';
 import { cn } from '../utils/cn';
 import { withTimeout } from '../utils/withTimeout';
+
 interface CRMPageProps {
     forcedView?: 'list' | 'kanban';
 }
@@ -73,10 +75,22 @@ export function CRMPage({ forcedView }: CRMPageProps) {
         localStorage.setItem('crm-view-mode', mode);
     };
 
-    const filtered = clients.filter(c =>
-        c.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.phone?.includes(searchTerm)
-    );
+    // ✅ PERFORMANCE: Memoizing filtered list to prevent O(N) filtering on every render.
+    // Also pre-calculates search lower case once to avoid repeated toLowerCase() calls in the loop.
+    const filtered = useMemo(() => {
+        const clientList = clients || [];
+        if (!searchTerm) return clientList;
+
+        const searchLower = searchTerm.toLowerCase();
+        return clientList.filter(client =>
+            client?.name?.toLowerCase().includes(searchLower) ||
+            client?.phone?.includes(searchTerm)
+        );
+    }, [clients, searchTerm]);
+
+    // ✅ SAFETY GUARD: Prevent rendering if clients data is missing and not loading.
+    if (!clients && !isLoading) return null;
+>>>>>>> 004fe50229f5868424fc294ebbdf607ec730a724
 
     return (
         <div className="space-y-8 pb-10">
