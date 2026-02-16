@@ -10,7 +10,8 @@
 interface InspectionMessageParams {
     clientName: string;
     clientPhone: string;
-    inspectionId: string;
+    inspectionId?: string; // Mantido por compatibilidade
+    publicToken?: string; // ✅ Novo: Token seguro para acesso público
     itemType?: string; // ✅ Adicionado para o link amigável
     companyName: string | null | undefined;
 }
@@ -37,16 +38,18 @@ function slugify(text: string): string {
  * @returns Formatted WhatsApp URL
  */
 export function formatInspectionMessage(params: InspectionMessageParams): string {
-    const { clientName, clientPhone, inspectionId, companyName, itemType } = params;
+    const { clientName, clientPhone, inspectionId, publicToken, companyName, itemType } = params;
 
     // ✅ Clean protocol selection based on environment
     const protocol = window.location.hostname === 'localhost' ? 'http://' : 'https://';
 
-    // ✅ Novo padrão amigável: /laudo/nome-cliente/tipo-item/id
+    // ✅ Novo padrão amigável: /laudo/nome-cliente/tipo-item/token
     const clientSlug = slugify(clientName || 'cliente');
     const itemSlug = slugify(itemType || 'inspecao');
 
-    const reportLink = `${protocol}${window.location.host}/laudo/${clientSlug}/${itemSlug}/${inspectionId}`;
+    // ✅ Hardening: Prioritiza o publicToken para evitar exposição de IDs internos (IDOR)
+    const secureId = publicToken || inspectionId;
+    const reportLink = `${protocol}${window.location.host}/laudo/${clientSlug}/${itemSlug}/${secureId}`;
 
     // ✅ Company name with safe fallback
     const coName = companyName || 'nossa empresa';

@@ -125,12 +125,13 @@ export function ClientModal({ isOpen, onClose, onSuccess, client }: ClientModalP
         }
     };
 
-    const handleSendReport = (inspection: any) => {
+    const handleSendReport = (inspection: any, publicToken?: string) => {
         // ✅ PHASE 4: Using centralized WhatsApp logic
         const whatsappUrl = formatInspectionMessage({
             clientName: client?.name || formData.name,
             clientPhone: client?.phone || formData.phone || '',
             inspectionId: inspection.id,
+            publicToken: publicToken,
             itemType: inspection.items?.item_type,
             companyName: company?.name
         });
@@ -417,7 +418,7 @@ export function ClientModal({ isOpen, onClose, onSuccess, client }: ClientModalP
                                                                     <button
                                                                         onClick={(e) => {
                                                                             e.stopPropagation();
-                                                                            handleSendReport(inspection);
+                                                                            handleSendReport(inspection, appointment.public_token);
                                                                         }}
                                                                         className="flex items-center justify-center gap-2 px-3 py-2 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 rounded-lg text-xs font-black border border-cyan-500/20 transition-all"
                                                                     >

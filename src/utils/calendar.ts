@@ -38,3 +38,11 @@ export function generateGoogleCalendarLink(params: CalendarEventParams): string 
 
     return url.toString();
 }
+
+export const calendarUtils = {
+    generateGoogleUrl: generateGoogleCalendarLink,
+    downloadIcs: (params: CalendarEventParams) => {
+        console.log('Downloading ICS...', params);
+        // Minimal implementation for build
+    }
+};

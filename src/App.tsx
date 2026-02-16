@@ -78,8 +78,8 @@ export default function App() {
             <Route path="/forgot" element={isAuthenticated ? <Navigate to="/" replace /> : <ForgotPasswordPage />} />
             <Route path="/reset" element={<ResetPasswordPage />} />
             <Route path="/share/:token" element={<ShareAppointmentPage />} />
-            <Route path="/share/report/:id" element={<ReportPublicPage />} />
-            <Route path="/laudo/:client/:item/:id" element={<ReportPublicPage />} />
+            <Route path="/share/report/:token" element={<ReportPublicPage />} />
+            <Route path="/laudo/:client/:item/:token" element={<ReportPublicPage />} />
 
             <Route path="/" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
               <Route index element={isTechnician ? <Navigate to="/portal" replace /> : <DashboardPage />} />
