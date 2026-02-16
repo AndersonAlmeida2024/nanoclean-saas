@@ -15,7 +15,7 @@ import { supabase } from '../lib/supabase';
 import { format } from 'date-fns';
 
 export function ReportPublicPage() {
-    const { id } = useParams();
+    const { token } = useParams();
     const [loading, setLoading] = useState(true);
     const [report, setReport] = useState<any>(null);
     const [error, setError] = useState<string | null>(null);
@@ -23,24 +23,18 @@ export function ReportPublicPage() {
     useEffect(() => {
         async function fetchReport() {
             try {
+                // Hardening: Usando RPC com Token Público em vez de ID direto para evitar IDOR
                 const { data, error } = await supabase
-                    .from('service_inspections')
-                    .select(`
-                        *,
-                        appointments (
-                            service_type,
-                            scheduled_date,
-                            scheduled_time,
-                            clients (name)
-                        )
-                    `)
-                    .eq('id', id)
-                    .single();
+                    .rpc('get_public_inspection', { p_token: token });
 
                 if (error) throw error;
                 if (!data) throw new Error('Laudo não encontrado.');
 
-                setReport(data);
+                // Adaptar retorno do RPC para o estado esperado
+                setReport({
+                    ...data,
+                    appointments: data.appointment
+                });
             } catch (err: any) {
                 console.error('Error fetching report:', err);
                 setError('Este laudo não foi encontrado ou está inacessível.');
@@ -49,8 +43,8 @@ export function ReportPublicPage() {
             }
         }
 
-        if (id) fetchReport();
-    }, [id]);
+        if (token) fetchReport();
+    }, [token]);
 
     const handlePrint = () => window.print();
 
