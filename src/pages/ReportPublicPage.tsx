@@ -23,19 +23,10 @@ export function ReportPublicPage() {
     useEffect(() => {
         async function fetchReport() {
             try {
+                // ✅ SECURITY: Uso de RPC com SECURITY DEFINER para acesso público blindado
+                // Evita exposição direta da tabela via RLS Anon e protege contra IDOR
                 const { data, error } = await supabase
-                    .from('service_inspections')
-                    .select(`
-                        *,
-                        appointments (
-                            service_type,
-                            scheduled_date,
-                            scheduled_time,
-                            clients (name)
-                        )
-                    `)
-                    .eq('id', id)
-                    .single();
+                    .rpc('get_public_inspection', { p_token: id });
 
                 if (error) throw error;
                 if (!data) throw new Error('Laudo não encontrado.');
