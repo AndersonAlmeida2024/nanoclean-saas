@@ -23,19 +23,10 @@ export function ReportPublicPage() {
     useEffect(() => {
         async function fetchReport() {
             try {
+                // Hardening: Usando RPC em vez de select direto para evitar Mass Listing Leaks
+                // e reforçar validação segura via Token (UUID)
                 const { data, error } = await supabase
-                    .from('service_inspections')
-                    .select(`
-                        *,
-                        appointments (
-                            service_type,
-                            scheduled_date,
-                            scheduled_time,
-                            clients (name)
-                        )
-                    `)
-                    .eq('id', id)
-                    .single();
+                    .rpc('get_public_inspection', { p_id: id });
 
                 if (error) throw error;
                 if (!data) throw new Error('Laudo não encontrado.');
