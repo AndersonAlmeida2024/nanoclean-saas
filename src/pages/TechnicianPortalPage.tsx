@@ -9,7 +9,6 @@ import {
     CheckCircle2,
     Loader2,
     AlertCircle,
-    ChevronRight,
     MessageCircle,
     Navigation,
     Wifi,
@@ -20,7 +19,7 @@ import { useAuthStore } from '../stores/authStore';
 import { appointmentService } from '../services/appointmentService';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { cn } from '../utils/cn';
 import { useQuery } from '@tanstack/react-query';
 import { InstallPWA } from '../components/InstallPWA';
@@ -46,7 +45,7 @@ export function TechnicianPortalPage() {
     }, []);
 
     // TanStack Query para carregar dados (com cache offline via persister)
-    const { data: appointments = [], isLoading, isError } = useQuery({
+    const { data: appointments = [], isLoading } = useQuery({
         queryKey: ['technician-appointments', activeCompanyId, user?.id, activeTab, today],
         queryFn: async () => {
             if (!activeCompanyId || !user) return [];
@@ -68,13 +67,13 @@ export function TechnicianPortalPage() {
 
     const handleWaze = (location: string) => {
         const encoded = encodeURIComponent(location);
-        window.open(`https://waze.com/ul?q=${encoded}&navigate=yes`, '_blank');
+        window.open(`https://waze.com/ul?q=${encoded}&navigate=yes`, '_blank', 'noopener,noreferrer');
     };
 
     const handleWhatsApp = (phone: string, name: string) => {
         const cleanPhone = phone.replace(/\D/g, '');
         const message = encodeURIComponent(`Olá ${name}, sou o técnico da NanoClean. Estarei chegando em breve para o seu atendimento!`);
-        window.open(`https://wa.me/${cleanPhone}?text=${message}`, '_blank');
+        window.open(`https://wa.me/${cleanPhone}?text=${message}`, '_blank', 'noopener,noreferrer');
     };
 
     if (isLoading && appointments.length === 0) {

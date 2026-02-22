@@ -70,7 +70,7 @@ export function ShareAppointmentPage() {
     };
 
     const handleGoogleCalendar = () => {
-        window.open(calendarUtils.generateGoogleUrl(eventDetails), '_blank');
+        window.open(calendarUtils.generateGoogleUrl(eventDetails), '_blank', 'noopener,noreferrer');
     };
 
     const handleIcsDownload = () => {
@@ -79,7 +79,7 @@ export function ShareAppointmentPage() {
 
     const handleGoogleMaps = () => {
         if (!appointment.client?.address) return;
-        window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(appointment.client.address)}`, '_blank');
+        window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(appointment.client.address)}`, '_blank', 'noopener,noreferrer');
     };
 
     return (

@@ -282,7 +282,7 @@ export const AppointmentCard = memo(({
                                                         time: appointment.scheduled_time,
                                                         serviceType: appointment.service_type
                                                     });
-                                                    window.open(url, '_blank');
+                                                    window.open(url, '_blank', 'noopener,noreferrer');
                                                 }}
                                                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-emerald-500/10 text-sm text-gray-300 transition-colors border-b border-white/5"
                                             >
@@ -309,7 +309,7 @@ export const AppointmentCard = memo(({
                                                         endTime: end,
                                                         guestEmail: appointment.clients?.email
                                                     });
-                                                    window.open(url, '_blank');
+                                                    window.open(url, '_blank', 'noopener,noreferrer');
                                                 }}
                                                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-cyan-500/10 text-sm text-gray-300 transition-colors border-b border-white/5"
                                             >
