@@ -119,7 +119,7 @@ export function SchedulePage() {
                 inspectionId: inspection.id,
                 companyName: company?.name
             });
-            window.open(whatsappUrl, '_blank');
+            window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
         } else {
             toast.error('Nenhuma inspeção encontrada.');
         }

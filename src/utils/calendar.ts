@@ -38,3 +38,38 @@ export function generateGoogleCalendarLink(params: CalendarEventParams): string 
 
     return url.toString();
 }
+
+/**
+ * satisfy Frontend Dependency Rule for calendarUtils
+ */
+export const calendarUtils = {
+    generateGoogleUrl: generateGoogleCalendarLink,
+    downloadIcs: (params: CalendarEventParams) => {
+        const { title, description, location, startTime, endTime } = params;
+        const fmtStart = startTime.replace(/[-:]/g, '').split('.')[0] + 'Z';
+        const fmtEnd = endTime.replace(/[-:]/g, '').split('.')[0] + 'Z';
+
+        const icsContent = [
+            'BEGIN:VCALENDAR',
+            'VERSION:2.0',
+            'BEGIN:VEVENT',
+            `SUMMARY:${title}`,
+            `DESCRIPTION:${description}`,
+            `LOCATION:${location}`,
+            `DTSTART:${fmtStart}`,
+            `DTEND:${fmtEnd}`,
+            'END:VEVENT',
+            'END:VCALENDAR'
+        ].join('\n');
+
+        const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', 'agendamento.ics');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+    }
+};
